@@ -59,6 +59,15 @@ in `sofia-ctx/sofia`.
     force real `sf` usage; measured outcome — `sf` lost on single-file
     comprehension — is in
     [`results/2026-07-02-t4-packagist-forced.md`](./results/2026-07-02-t4-packagist-forced.md).**
+  - `t5_dispatch` — map the CLI's command-dispatch architecture across 13
+    files in 12 packages: each file's declared types/struct fields and
+    function signatures, plus the shared `main → calllog.Run → NewCommand →
+    Run(Options)` spine. Answerable from `sf code <file>`'s one-shot
+    structural summary (no bodies); the control arm reads the files in full.
+    The many-file / need-only-the-shape regime `micro.md`'s `t1_deal` found
+    favored `sf`. **Measured outcome — `sf` won on dollars (−18.6%) via the
+    cache-read cost-shift, while using +56% more tokens — is in
+    [`results/2026-07-02-t5-dispatch.md`](./results/2026-07-02-t5-dispatch.md).**
 - **N repeats** per (arm × task) → median (an LLM is not deterministic).
 - Isolation: every run is a fresh `git worktree --detach` off a frozen
   `BASE_SHA`, removed after. Model is fixed across both arms (`MODEL`,
