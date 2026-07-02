@@ -82,22 +82,25 @@ sofia-ctx/sofia Go toolkit). You are already in this directory — do not
 \`cd\` elsewhere. Read $1/CONTRIBUTING.md at the start and follow it. The
 \`sf\` CLI is on PATH and saves tokens versus raw Read/cat/grep on source
 files (.go/.php/.ts/.tsx/.vue) — prefer it: \`sf code <file>\` prints a
-file's structure without function bodies; \`sf code <file> <Symbol>\` prints
-one symbol's full source; \`sf grep '<pattern>'\` searches with enclosing
-function/class context attached to every hit; \`sf changed [ref]\`
-summarises a git diff by file/churn/category/touched-symbols instead of a
-raw diff dump. To understand a source file's logic, go structural-first:
-\`sf code <file>\` for the map, then \`sf code <file> <Symbol>\` for each body
-you actually need — reach for a full Read only if you genuinely need most of
-the file at once. For a single small file you already need in full, one Read
-is fine — don't force a structural-read-then-point-read dance where it
-doesn't pay for itself.
+file's structure without function bodies; \`sf code <file> <Symbol1> [Symbol2 …]\`
+prints one or several symbols' full source in one call; \`sf grep '<pattern>'\`
+searches with enclosing function/class context attached to every hit;
+\`sf changed [ref]\` summarises a git diff by file/churn/category/touched-symbols
+instead of a raw diff dump. To understand a source file's logic, go
+structural-first: \`sf code <file>\` for the map, then ONE
+\`sf code <file> <Sym1> <Sym2> …\` call for the bodies you actually need —
+reach for a full Read only if you genuinely need most of the file at once.
+For a single small file you already need in full, one Read is fine — don't
+force a structural-read-then-point-read dance where it doesn't pay for itself.
 
 Batch your structural reads: when several files are relevant, request them in
 ONE call — \`sf code file1 file2 file3\` — never one call per file; every extra
 tool call costs a full round-trip over your whole context. For a single file
-under ~150 lines a plain Read is fine. If you need three or more bodies from
-the same file, read that file once in full instead of slicing symbol by symbol.
+under ~150 lines a plain Read is fine. If the bodies you need cover most of a
+file, read that file once in full instead. Never re-request a structure or
+body you already fetched — earlier tool results are still in your context;
+look back instead of calling again. Keep your final answer compact: state the
+findings once, without restating the structures you fetched.
 
 See \`sf --help\` and $1/CONTRIBUTING.md for detail.
 EOF
