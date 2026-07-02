@@ -34,7 +34,9 @@ $diff
 === go vet (only run when diff is non-empty) ===
 $vet"
   verdict="$(claude -p "$prompt" --model "$MODEL" --output-format json \
-    --allowedTools '' 2>/dev/null | jq -r '.result // "{}"')"
+    --tools "" --safe-mode --no-session-persistence \
+    --system-prompt "You are a strict rubric-scoring judge. Output nothing but the requested single-line JSON object." \
+    2>/dev/null | jq -r '.result // "{}"')"
   # tolerate prose/fences/newlines around the JSON object
   verdict="$(printf '%s' "$verdict" | tr -d '\n' | grep -oE '\{.*\}' | head -1)"
   if ! jq -e . >/dev/null 2>&1 <<<"$verdict"; then
