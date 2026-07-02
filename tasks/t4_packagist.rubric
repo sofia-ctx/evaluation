@@ -1,0 +1,77 @@
+Task: summarise the network-retry and version-selection logic of the single
+file `internal/common/packagist/packagist.go` (sofia-ctx/sofia, frozen at
+BASE_SHA). Comprehension task — no edits expected.
+
+Reference facts (frozen, verified by reading the real file at BASE_SHA):
+
+1) Retry loop. `fetchPackagistLatest` calls
+   `fetchWithRetry(ctx, name, doP2Request, 3, 200*time.Millisecond)` under a
+   30s context — so 3 attempts, base backoff 200ms. In `fetchWithRetry`:
+   - a nil-error attempt returns its version immediately (success);
+   - after an error it sets lastErr, then `break`s (stops, returns lastErr)
+     if the error is NOT retryable OR this was the last attempt
+     (`i == attempts-1`);
+   - only a retryable error on a non-final attempt sleeps and loops again;
+   - if the context is cancelled while waiting, it returns "" and ctx.Err()
+     (the `<-ctx.Done()` branch of the select), not lastErr.
+
+2) Backoff. `backoff(base, attempt)` returns an exponential delay that grows
+   by a factor of 3 per attempt (base, base*3, base*9, …). It applies
+   "equal jitter": it computes d = base*3^attempt, then returns
+   half + rand(0..half) where half = d/2 — i.e. the result lands in the
+   range [d/2, d]. `base <= 0` returns 0 (used to make tests fast).
+
+3) 429 / Retry-After. On HTTP 429 `doP2Request` returns
+   ("", true, &retryAfterError{after: retryAfter(resp), err: ...}). Back in
+   `fetchWithRetry`, the computed `backoff` value is used by default, but the
+   loop does `errors.As(err, &ra)` and, if `ra.after > 0`, overrides the
+   wait with that server-suggested delay. `retryAfter` parses ONLY the
+   whole-seconds integer form of the `Retry-After` header (via
+   strconv.Atoi), requiring n > 0; it returns 0 when the header is absent,
+   non-numeric, or an HTTP-date — it does NOT parse the HTTP-date form. When
+   `retryAfter` returns 0, `ra.after > 0` is false, so the loop falls back to
+   the computed exponential backoff.
+
+4) doP2Request HTTP-status outcome map (version, retryable, err):
+   - 404  → ("", false, nil)  — genuinely unpublished; NOT an error, NOT
+     retried. This is the key distinction: a 404 tells the caller the
+     package is unpublished (Collect leaves Packagist "" and later classifies
+     it "unpublished"), whereas a transient failure returns a non-nil error
+     that makes Collect mark the package "unknown". A 404 must not be
+     conflated with a probe failure.
+   - 200  → (parsed latest stable version, false, err-from-parse) — success;
+     a JSON parse error is returned but is NOT retryable.
+   - 429  → ("", true, retryAfterError{...}) — transient, retryable, carries
+     Retry-After.
+   - 5xx  → ("", true, err) — transient, retryable.
+   - other 4xx (e.g. 403, 410) → ("", false, err) — non-retryable error.
+   (Also: a network/timeout error from the HTTP call itself → ("", true, err)
+   — transient.)
+
+Criteria (score 0-100 = fraction satisfied; PASS if ALL four are met):
+- Q1 retry loop: correctly states 3 attempts AND that retries happen only
+  for retryable errors on non-final attempts, stopping early on success or a
+  non-retryable error or the last attempt. (Base 200ms is a nice-to-have,
+  not required for pass.) An answer claiming it retries on every error, or a
+  fixed unconditional number of sleeps regardless of retryability, is wrong.
+- Q2 backoff: correctly states the ×3 exponential growth AND that jitter
+  makes the delay fall between half and the full computed value (equivalently
+  "d/2 + up to d/2", "equal jitter", or "roughly half-to-full"). An answer
+  that omits the exponential growth, or describes the wrong factor (e.g. ×2),
+  is wrong. base<=0 → 0 is a nice-to-have.
+- Q3 Retry-After: correctly states that only the integer-seconds form is
+  parsed and that an absent/HTTP-date/invalid header yields 0 → the loop uses
+  the computed backoff instead; AND that a valid positive Retry-After
+  overrides the computed backoff. An answer claiming it also parses the
+  HTTP-date form, or that Retry-After is ignored entirely, is wrong.
+- Q4 status map: correctly gives the 404 → ("",false,nil) "unpublished, not
+  an error, not retried" behaviour AND correctly distinguishes it from a
+  transient failure (429/5xx/network → retryable error, → "unknown" at the
+  caller); AND correctly marks 429 and 5xx as retryable and a plain 403/other
+  4xx as non-retryable. Getting the 404-vs-transient distinction backwards
+  (e.g. claiming 404 is retried, or that a 5xx is treated as unpublished) is
+  wrong.
+- No files were modified (git diff must be empty). Any diff is a FAIL.
+
+PASS if all four questions meet their bar AND the diff is empty. Otherwise
+FAIL.

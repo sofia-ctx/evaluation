@@ -49,6 +49,13 @@ in `sofia-ctx/sofia`.
     (`internal/cc/pricing.go`), reusing an existing helper. A plain `Read` of
     the whole (small) file is already cheap; a structural-summary-then-body
     round trip is extra ceremony for no win. **Favors `plain`.**
+  - `t4_packagist` — comprehend the retry/backoff/version-selection logic of
+    one ~12KB file (`internal/common/packagist/packagist.go`) well enough to
+    answer four questions about its actual behaviour. A full-file `Read` is
+    the obvious first move, so under `SF_HOOK_MODE=strict` the `sf` arm's
+    PreToolUse hook actually fires and pushes the agent onto
+    `sf code`/`sf code <Symbol>` — the design that makes the treatment arm
+    differ by tool *usage*, not just availability. **Favors `sf`.**
 - **N repeats** per (arm × task) → median (an LLM is not deterministic).
 - Isolation: every run is a fresh `git worktree --detach` off a frozen
   `BASE_SHA`, removed after. Model is fixed across both arms (`MODEL`,
@@ -100,10 +107,12 @@ prints a CSV summary to stdout.
 | `ARMS` | `sf plain` | space-separated arms to run |
 | `TASKS` | `t1_calllog t2_composer t3_pricing` | space-separated task names (must have matching `tasks/<name>.task`/`.rubric`) |
 | `REPS` | `5` | repeats per (arm × task) |
+| `REP_START` | `1` | first rep index to run — resume a partial run (e.g. run rep 1 as a pilot, then `REP_START=2` to finish) without redoing completed reps |
 | `MODEL` | `sonnet` | model, fixed across both arms |
 | `RUN_TIMEOUT` | `600` | seconds before a single run is killed |
 | `WTBASE` | `/tmp/ab-sofia-wt` | scratch dir for worktrees |
 | `PERM` | `allowlist` | `allowlist` (guarded) or `bypass` (`--dangerously-skip-permissions`) |
+| `SF_HOOK_MODE` | `nudge` | `SOFIA_HOOK_MODE` for the `sf` arm's `sf hook pre` nudge: `nudge` (deny first full read of a big source file, repeat passes — production default), `strict` (always deny full reads of big source files), `suggest` (advise only), `off`. The `plain` arm is always `off`. |
 | `JUDGE_MODEL` | `sonnet` | model used by `judge.sh` |
 
 ## Metrics

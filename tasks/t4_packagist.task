@@ -1,0 +1,36 @@
+Study the network-retry and version-selection logic in the single file
+`internal/common/packagist/packagist.go` (package `packagist`, which
+implements `sf packagist status`). This is a comprehension task about that
+one file's actual behaviour — you need to understand what its functions
+really do, not just where they are.
+
+Produce a short, precise technical summary answering all four questions.
+Ground every answer in the real function bodies, not guesses:
+
+1) The retry loop. `fetchPackagistLatest` calls `fetchWithRetry`. State how
+   many attempts it makes and the base backoff delay it starts from, and
+   describe exactly when the loop retries versus when it stops early: what
+   happens on a successful attempt, on a NON-retryable error, on the final
+   attempt, and if the surrounding context is cancelled during the wait.
+
+2) The backoff delay. Describe how `backoff(base, attempt)` computes its
+   wait: the growth factor between successive attempts, the jitter it
+   applies (what range the returned duration falls in relative to the
+   un-jittered delay), and what it returns when `base <= 0`.
+
+3) The 429 / Retry-After path. Explain how a Packagist HTTP 429 response
+   flows through `doP2Request` and back into `fetchWithRetry`: how the
+   server's `Retry-After` value reaches the loop and when it overrides the
+   computed backoff. State precisely which form(s) of the `Retry-After`
+   header `retryAfter` actually parses, and what it returns (and hence what
+   the loop then waits) when the header is absent or in a form it does not
+   parse.
+
+4) The HTTP-status outcome map in `doP2Request`. For each of these, give the
+   `(version, retryable, err)` triple it returns and, in one phrase, the
+   meaning: 404, 200, 429, a 5xx, and a non-429/non-404 4xx such as 403.
+   Note in particular how a 404 is treated differently from a transient
+   failure, and why that distinction matters to the caller (`Collect`).
+
+Answer compactly as a numbered list. Do NOT modify any files — this is an
+investigation and summary task only.

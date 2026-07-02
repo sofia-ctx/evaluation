@@ -12,7 +12,7 @@
 # only in the disposable worktree. PERM=bypass switches to
 # --dangerously-skip-permissions (faster, unguarded — opt-in only).
 #
-# Knobs (env): TARGET_REPO BASE_SHA ARMS TASKS REPS MODEL RUN_TIMEOUT WTBASE PERM
+# Knobs (env): TARGET_REPO BASE_SHA ARMS TASKS REPS REP_START MODEL RUN_TIMEOUT WTBASE PERM SF_HOOK_MODE
 #
 # Smoke (cheapest possible unit — proves the mechanics, not a result):
 #   REPS=1 ARMS=sf TASKS=t3_pricing bash run.sh
@@ -37,9 +37,22 @@ MODEL="${MODEL:-sonnet}"
 ARMS="${ARMS:-sf plain}"
 TASKS="${TASKS:-t1_calllog t2_composer t3_pricing}"
 REPS="${REPS:-5}"
+# First rep index to run (default 1). Lets a partial run resume without
+# redoing completed reps — e.g. run rep 1 as a pilot, inspect it, then
+# REP_START=2 to finish reps 2..REPS reusing the pilot's rep-1 artifacts.
+REP_START="${REP_START:-1}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-600}"
 WTBASE="${WTBASE:-/tmp/ab-sofia-wt}"
 PERM="${PERM:-allowlist}" # allowlist (guarded) | bypass (--dangerously-skip-permissions)
+# SOFIA_HOOK_MODE for the sf arm's `sf hook pre` PreToolUse nudge:
+#   nudge (default, production) — deny the FIRST full read of a big source
+#   file, let an identical repeat through; strict — always deny full reads of
+#   big source files (no second-chance pass-through); suggest — advise only.
+# The control arm always forces off. Set SF_HOOK_MODE=strict to make the hook
+# an actual forcing function on a full-file-comprehension task (see
+# tasks/t4_packagist.*), so the arm is differentiated by tool *usage*, not
+# just tool availability.
+SF_HOOK_MODE="${SF_HOOK_MODE:-nudge}"
 
 if [ ! -d "$TARGET_REPO/.git" ]; then
   echo "! TARGET_REPO ($TARGET_REPO) is not a git checkout. Clone sofia-ctx/sofia next to this repo, or set TARGET_REPO." >&2
@@ -62,7 +75,10 @@ file's structure without function bodies; \`sf code <file> <Symbol>\` prints
 one symbol's full source; \`sf grep '<pattern>'\` searches with enclosing
 function/class context attached to every hit; \`sf changed [ref]\`
 summarises a git diff by file/churn/category/touched-symbols instead of a
-raw diff dump. For a single small file you already need in full, one Read
+raw diff dump. To understand a source file's logic, go structural-first:
+\`sf code <file>\` for the map, then \`sf code <file> <Symbol>\` for each body
+you actually need — reach for a full Read only if you genuinely need most of
+the file at once. For a single small file you already need in full, one Read
 is fine — don't force a structural-read-then-point-read dance where it
 doesn't pay for itself. See \`sf --help\` and $1/CONTRIBUTING.md for detail.
 EOF
@@ -112,7 +128,10 @@ run_one() {
   local t0 t1 rc
   t0=$(date +%s.%N)
   if [ "$arm" = sf ]; then
-    ( cd "$wt" && timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
+    # SOFIA_HOOK_MODE ($SF_HOOK_MODE, default nudge) drives the global
+    # `sf hook pre` PreToolUse nudge for the treatment arm; strict turns it
+    # into a hard forcing function toward `sf code` on big source files.
+    ( cd "$wt" && SOFIA_HOOK_MODE="$SF_HOOK_MODE" timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
       >"$stem.json" 2>"$stem.stderr"; rc=$?
   else
     # SOFIA_HOOK_MODE=off silences the global `sf hook pre` PreToolUse nudge
@@ -137,10 +156,10 @@ run_one() {
   echo "  done $arm/$task/$rep  rc=$rc  wall=${wall_ms}ms  cost=\$$cost  sid=$sid"
 }
 
-echo "A/B run: target=$TARGET_REPO base=$BASE_SHA arms=[$ARMS] tasks=[$TASKS] reps=$REPS model=$MODEL perm=$PERM"
+echo "A/B run: target=$TARGET_REPO base=$BASE_SHA arms=[$ARMS] tasks=[$TASKS] reps=$REPS model=$MODEL perm=$PERM sf_hook=$SF_HOOK_MODE"
 for task in $TASKS; do
   for arm in $ARMS; do
-    for rep in $(seq 1 "$REPS"); do
+    for rep in $(seq "$REP_START" "$REPS"); do
       run_one "$arm" "$task" "$rep"
     done
   done
