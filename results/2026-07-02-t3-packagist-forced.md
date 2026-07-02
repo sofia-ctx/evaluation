@@ -1,4 +1,4 @@
-# t4_packagist A/B: does `sf` earn its tokens once it's actually used?
+# t3_packagist A/B: does `sf` earn its tokens once it's actually used?
 
 A follow-up to an earlier, **invalid** attempt (`t1_calllog`, not published —
 it measured nothing, see below). That attempt tried to measure `sf` vs `plain`
@@ -15,7 +15,7 @@ This run fixes the **mechanism gap** and re-measures. The fix has three parts,
 all aimed at the same thing — making `sf` actually get exercised so the arms
 differ by tool *usage*, not just availability:
 
-1. **A task the hook can engage.** `t4_packagist` is single-file comprehension:
+1. **A task the hook can engage.** `t3_packagist` is single-file comprehension:
    understand the retry/backoff/version-selection logic of one ~12KB file
    (`internal/common/packagist/packagist.go`) well enough to answer four
    non-trivial questions about its actual behaviour. A full-file `Read` is the
@@ -36,9 +36,9 @@ differ by tool *usage*, not just availability:
 
 ```
 # free mechanical proof first (Step 2 below), then:
-REPS=1  ARMS=sf    TASKS=t4_packagist SF_HOOK_MODE=strict bash run.sh   # pilot = sf rep 1
-REP_START=2 REPS=3 ARMS=sf    TASKS=t4_packagist SF_HOOK_MODE=strict bash run.sh   # sf reps 2-3
-REPS=3  ARMS=plain TASKS=t4_packagist bash run.sh                        # plain reps 1-3
+REPS=1  ARMS=sf    TASKS=t3_packagist SF_HOOK_MODE=strict bash run.sh   # pilot = sf rep 1
+REP_START=2 REPS=3 ARMS=sf    TASKS=t3_packagist SF_HOOK_MODE=strict bash run.sh   # sf reps 2-3
+REPS=3  ARMS=plain TASKS=t3_packagist bash run.sh                        # plain reps 1-3
 bash judge.sh
 bash aggregate.sh
 ```
@@ -156,12 +156,12 @@ the same rigorous way — `calls.jsonl` cross-checked against every transcript:
 
 - **Calllog cross-check.** `sf`'s shared log
   (`~/.local/state/sofia/calls.jsonl`) tags each invocation with the worktree
-  basename. `sf`-arm tags `sf-t4_packagist-{1,2,3}` carry **27** entries: rep 1
+  basename. `sf`-arm tags `sf-t3_packagist-{1,2,3}` carry **27** entries: rep 1
   = 9× `code`; rep 2 = 8× `code` + 1× `grep`; rep 3 = 9× `code`. Zero entries
   tagged to any `plain` worktree (the `plain` arm has no `Bash(sf:*)` allowance
   and is told not to use `sf`).
 - **Transcript cross-check.** Each session transcript (located via `session_id`
-  in `runs/<arm>/t4_packagist/*.json`) was read and every `tool_use` enumerated:
+  in `runs/<arm>/t3_packagist/*.json`) was read and every `tool_use` enumerated:
   - `sf` rep 1: 3 `Bash` (all `sf code …`), **0 `Read`**.
   - `sf` rep 2: 3 `Bash` (`sf code …`), 2 `Grep`, **0 `Read`**.
   - `sf` rep 3: 3 `Bash` (all `sf code …`), **0 `Read`**.
@@ -196,7 +196,7 @@ reconstructs roughly the whole file across more round-trips than reading it
 once. This is consistent with `sf`'s own `sf-context` skill, which says the
 structural drill-down pays off on comprehension across *many / unfamiliar*
 files and on larger models — not on a single file you end up needing in full,
-where a plain `Read` is cheaper. `t4_packagist` was designed to *force* `sf`
+where a plain `Read` is cheaper. `t3_packagist` was designed to *force* `sf`
 usage (and it did); it turns out that forcing `sf` onto a task at the wrong end
 of that boundary makes it lose honestly, rather than lose vacuously as in
 `t1_calllog`.

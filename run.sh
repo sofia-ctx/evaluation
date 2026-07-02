@@ -15,7 +15,7 @@
 # Knobs (env): TARGET_REPO BASE_SHA ARMS TASKS REPS REP_START MODEL RUN_TIMEOUT WTBASE PERM SF_HOOK_MODE
 #
 # Smoke (cheapest possible unit — proves the mechanics, not a result):
-#   REPS=1 ARMS=sf TASKS=t3_pricing bash run.sh
+#   REPS=1 ARMS=sf TASKS=t2_pricing bash run.sh
 # Full study (real cost — a separate, deliberate decision, not a default):
 #   bash run.sh
 set -uo pipefail
@@ -35,7 +35,7 @@ TARGET_REPO="${TARGET_REPO:-../sofia}"
 BASE_SHA="${BASE_SHA:-257718bfc4d6fee74322c24f4c90e8db02c99efa}"
 MODEL="${MODEL:-sonnet}"
 ARMS="${ARMS:-sf plain}"
-TASKS="${TASKS:-t2_composer t3_pricing}"
+TASKS="${TASKS:-t1_composer t2_pricing}"
 REPS="${REPS:-5}"
 # First rep index to run (default 1). Lets a partial run resume without
 # redoing completed reps — e.g. run rep 1 as a pilot, inspect it, then
@@ -50,7 +50,7 @@ PERM="${PERM:-allowlist}" # allowlist (guarded) | bypass (--dangerously-skip-per
 #   big source files (no second-chance pass-through); suggest — advise only.
 # The control arm always forces off. Set SF_HOOK_MODE=strict to make the hook
 # an actual forcing function on a full-file-comprehension task (see
-# tasks/t4_packagist.*), so the arm is differentiated by tool *usage*, not
+# tasks/t3_packagist.*), so the arm is differentiated by tool *usage*, not
 # just tool availability.
 SF_HOOK_MODE="${SF_HOOK_MODE:-nudge}"
 
