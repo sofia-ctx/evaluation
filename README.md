@@ -133,7 +133,16 @@ prints a CSV summary to stdout.
 | `WTBASE` | `/tmp/ab-sofia-wt` | scratch dir for worktrees |
 | `PERM` | `allowlist` | `allowlist` (guarded) or `bypass` (`--dangerously-skip-permissions`) |
 | `SF_HOOK_MODE` | `nudge` | `SOFIA_HOOK_MODE` for the `sf` arm's `sf hook pre` nudge: `nudge` (deny first full read of a big source file, repeat passes — production default), `strict` (always deny full reads of big source files), `suggest` (advise only), `off`. The `plain` arm is always `off`. |
+| `SF_BIN` | unset — built from `TARGET_REPO@BASE_SHA` | path to an `sf` binary put first on `PATH` inside every spawned session, both arms. Unset (default) builds one automatically once per `run.sh` invocation; see "Environment pinning" below. |
 | `JUDGE_MODEL` | `sonnet` | model used by `judge.sh` |
+
+Reproducibility note: `sofia`'s hook default `SOFIA_HOOK_MIN_BYTES` moved
+4096→8192 on its `main` after the published `t1_composer` result (a
+strict-deny of a ~7 KB file — between the two thresholds). The default
+`SF_BIN` build is pinned to `BASE_SHA`, so it still carries the old 4096
+default and reproduces `t1_composer` automatically; only a `SF_BIN` you point
+at a newer build needs `SOFIA_HOOK_MIN_BYTES=4096` exported alongside it to
+match.
 
 ## Metrics
 
@@ -155,6 +164,19 @@ Drop a `tasks/<name>.task` (the prompt handed to the agent) and a matching
 judge). Verify every fact in the rubric against the real file at `BASE_SHA`
 before writing it down — an invented fact makes the judge unreliable in
 either direction.
+
+## Environment pinning
+
+`SF_BIN` (see knobs above) pins every spawned session's `sf` to a binary
+built from `TARGET_REPO@BASE_SHA`, so a stranger's run exercises the same
+code the published results did, not whatever `sf` happens to be first on
+their own `PATH`. Runs before this knob existed — the published `t1`–`t4`
+results in `results/` — exercised whatever `sf` was on the operator's `PATH`
+at the time; in those original runs that was the maintainer's private local
+build, not `sofia-ctx/sofia`'s public code at `BASE_SHA`. Those historical
+records are not retro-edited to reflect this. The installed
+`~/.claude/skills` copy of the `sf-context` skill (see Requirements) is a
+separate, still-ambient, non-pinned factor that `SF_BIN` doesn't touch.
 
 ## Caveats
 

@@ -12,7 +12,7 @@
 # only in the disposable worktree. PERM=bypass switches to
 # --dangerously-skip-permissions (faster, unguarded — opt-in only).
 #
-# Knobs (env): TARGET_REPO BASE_SHA ARMS TASKS REPS REP_START MODEL RUN_TIMEOUT WTBASE PERM SF_HOOK_MODE
+# Knobs (env): TARGET_REPO BASE_SHA ARMS TASKS REPS REP_START MODEL RUN_TIMEOUT WTBASE PERM SF_HOOK_MODE SF_BIN
 #
 # Smoke (cheapest possible unit — proves the mechanics, not a result):
 #   REPS=1 ARMS=sf TASKS=t2_pricing bash run.sh
@@ -53,6 +53,17 @@ PERM="${PERM:-allowlist}" # allowlist (guarded) | bypass (--dangerously-skip-per
 # tasks/t3_packagist.*), so the arm is differentiated by tool *usage*, not
 # just tool availability.
 SF_HOOK_MODE="${SF_HOOK_MODE:-nudge}"
+# Path to an `sf` binary to put first on PATH inside every spawned session,
+# both arms — the global `sf hook pre` PreToolUse hook resolves `sf` via PATH
+# at session runtime even in the plain arm (SOFIA_HOOK_MODE=off just makes
+# it a fast no-op there), so both arms must resolve the same pinned binary
+# or the comparison silently drifts onto whatever build happens to be
+# ambient. Unset (default): built once per run.sh invocation from
+# TARGET_REPO@BASE_SHA (see resolve_sf_bin), so a stranger cloning this repo
+# reproduces the maintainer's binary instead of whatever they personally
+# have on PATH.
+SF_BIN="${SF_BIN:-}"
+SF_BIN_DIR=""
 
 if [ ! -d "$TARGET_REPO/.git" ]; then
   echo "! TARGET_REPO ($TARGET_REPO) is not a git checkout. Clone sofia-ctx/sofia next to this repo, or set TARGET_REPO." >&2
@@ -80,7 +91,15 @@ raw diff dump. To understand a source file's logic, go structural-first:
 you actually need — reach for a full Read only if you genuinely need most of
 the file at once. For a single small file you already need in full, one Read
 is fine — don't force a structural-read-then-point-read dance where it
-doesn't pay for itself. See \`sf --help\` and $1/CONTRIBUTING.md for detail.
+doesn't pay for itself.
+
+Batch your structural reads: when several files are relevant, request them in
+ONE call — \`sf code file1 file2 file3\` — never one call per file; every extra
+tool call costs a full round-trip over your whole context. For a single file
+under ~150 lines a plain Read is fine. If you need three or more bodies from
+the same file, read that file once in full instead of slicing symbol by symbol.
+
+See \`sf --help\` and $1/CONTRIBUTING.md for detail.
 EOF
 }
 
@@ -131,12 +150,16 @@ run_one() {
     # SOFIA_HOOK_MODE ($SF_HOOK_MODE, default nudge) drives the global
     # `sf hook pre` PreToolUse nudge for the treatment arm; strict turns it
     # into a hard forcing function toward `sf code` on big source files.
-    ( cd "$wt" && SOFIA_HOOK_MODE="$SF_HOOK_MODE" timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
+    # PATH is pinned to SF_BIN_DIR so both the agent's own `sf` calls and the
+    # hook resolve the same TARGET_REPO@BASE_SHA build, not whatever's ambient.
+    ( cd "$wt" && PATH="$SF_BIN_DIR:$PATH" SOFIA_HOOK_MODE="$SF_HOOK_MODE" timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
       >"$stem.json" 2>"$stem.stderr"; rc=$?
   else
     # SOFIA_HOOK_MODE=off silences the global `sf hook pre` PreToolUse nudge
     # for the control arm even though it's registered in ~/.claude/settings.json.
-    ( cd "$wt" && SOFIA_HOOK_MODE=off timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
+    # PATH is still pinned: the hook still resolves `sf` via PATH to run its
+    # (now no-op) check, so it must be the same pinned binary as the sf arm.
+    ( cd "$wt" && PATH="$SF_BIN_DIR:$PATH" SOFIA_HOOK_MODE=off timeout "$RUN_TIMEOUT" claude -p "$prompt" "${common[@]}" "${args[@]}" ) \
       >"$stem.json" 2>"$stem.stderr"; rc=$?
   fi
   t1=$(date +%s.%N)
@@ -156,12 +179,66 @@ run_one() {
   echo "  done $arm/$task/$rep  rc=$rc  wall=${wall_ms}ms  cost=\$$cost  sid=$sid"
 }
 
-echo "A/B run: target=$TARGET_REPO base=$BASE_SHA arms=[$ARMS] tasks=[$TASKS] reps=$REPS model=$MODEL perm=$PERM sf_hook=$SF_HOOK_MODE"
-for task in $TASKS; do
-  for arm in $ARMS; do
-    for rep in $(seq "$REP_START" "$REPS"); do
-      run_one "$arm" "$task" "$rep"
+# Resolve SF_BIN/SF_BIN_DIR before any claude call is spawned. If SF_BIN is
+# already set (user knob), just point SF_BIN_DIR at its directory. Otherwise
+# build one from TARGET_REPO@BASE_SHA: same detached-worktree technique
+# run_one uses for task worktrees, but here just to compile a pinned binary.
+# Returns non-zero (and prints why) instead of ever letting a run start
+# against an unpinned or broken `sf` — a stranger's clone should reproduce
+# the maintainer's binary, not silently fall through to PATH.
+resolve_sf_bin() {
+  if [ -n "$SF_BIN" ]; then
+    if [ ! -x "$SF_BIN" ]; then
+      echo "! SF_BIN=$SF_BIN is not an executable file" >&2
+      return 1
+    fi
+    SF_BIN_DIR="$(cd "$(dirname "$SF_BIN")" && pwd)"
+    echo "Using pinned sf binary: $SF_BIN" >&2
+    return 0
+  fi
+
+  local short
+  short="$(git -C "$TARGET_REPO" rev-parse --short "$BASE_SHA" 2>/dev/null)"
+  if [ -z "$short" ]; then
+    echo "! could not resolve BASE_SHA ($BASE_SHA) in TARGET_REPO ($TARGET_REPO)" >&2
+    return 1
+  fi
+  local srcwt="$WTBASE/sf-bin-src-$short"
+  local bindir="$WTBASE/sf-bin-$short"
+  rm -rf "$srcwt"
+  echo "Building pinned sf binary from TARGET_REPO@$short into $bindir ..." >&2
+  if ! git -C "$TARGET_REPO" worktree add -q --detach "$srcwt" "$BASE_SHA"; then
+    echo "! could not create build worktree for sf@$short" >&2
+    return 1
+  fi
+  mkdir -p "$bindir"
+  if ! ( cd "$srcwt" && go build -o "$bindir/sf" ./cmd/sf ); then
+    echo "! go build of sf@$short failed — aborting before spending anything" >&2
+    git -C "$TARGET_REPO" worktree remove --force "$srcwt" >/dev/null 2>&1
+    return 1
+  fi
+  git -C "$TARGET_REPO" worktree remove --force "$srcwt" >/dev/null 2>&1
+  SF_BIN="$bindir/sf"
+  SF_BIN_DIR="$bindir"
+  echo "Pinned sf binary ready: $SF_BIN" >&2
+}
+
+# Guard so this file can be `source`d (e.g. to call resolve_sf_bin directly
+# for a free, no-claude-calls test of the build-pinning path) without also
+# kicking off the full, money-spending A/B loop below.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  if ! resolve_sf_bin; then
+    echo "! could not resolve a pinned sf binary — aborting before running anything." >&2
+    exit 1
+  fi
+
+  echo "A/B run: target=$TARGET_REPO base=$BASE_SHA arms=[$ARMS] tasks=[$TASKS] reps=$REPS model=$MODEL perm=$PERM sf_hook=$SF_HOOK_MODE sf_bin=$SF_BIN"
+  for task in $TASKS; do
+    for arm in $ARMS; do
+      for rep in $(seq "$REP_START" "$REPS"); do
+        run_one "$arm" "$task" "$rep"
+      done
     done
   done
-done
-echo "Done. Next: bash judge.sh && bash aggregate.sh"
+  echo "Done. Next: bash judge.sh && bash aggregate.sh"
+fi
