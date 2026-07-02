@@ -12,7 +12,7 @@ Glob/Edit only, with the nudge switched off. The thing measured is **real
 billed cost and tokens** from `claude -p --output-format json`
 (`total_cost_usd`, `usage.*`) — not a heuristic, not a token estimate.
 
-This repo is the reusable tool, not a single result. It ships three demo
+This repo is the reusable tool, not a single result. It ships demo
 tasks that run against `sofia-ctx/sofia`'s own public Go code, so a stranger
 can clone both repos and run a real (if tiny) A/B session end to end with no
 private access. For the full methodology writeup and the original
@@ -36,12 +36,8 @@ in `sofia-ctx/sofia`.
     (Read/Grep/Glob/Edit); the preamble explicitly forbids `sf`;
     `SOFIA_HOOK_MODE=off` silences the nudge hook for this arm even though
     it's registered globally.
-- **3 tasks**, chosen at the break-even boundary (see
+- **Tasks**, chosen at or across the break-even boundary (see
   [`tasks/`](./tasks)):
-  - `t1_calllog` — trace a logging pattern (`calllog.Start`/`RecordOutput`/
-    `Finish`) across ~22 files in two package trees and summarise it.
-    Multi-file comprehension — the territory `sf grep`/`sf code`/`sf changed`
-    are built for. **Favors `sf`.**
   - `t2_composer` — add one optional field to a Go struct in
     `internal/common/composer/show.go`, matching the file's existing style.
     Single file, moderate. **Neutral.**
@@ -55,8 +51,9 @@ in `sofia-ctx/sofia`.
     the obvious first move — exactly what `SF_HOOK_MODE=strict`'s PreToolUse
     hook denies — so the `sf` arm is routed onto `sf code`/`sf code <Symbol>`.
     This is the task that makes the treatment arm differ by tool *usage*, not
-    just availability (the gap that invalidated `t1_calllog`). **Designed to
-    force real `sf` usage; measured outcome — `sf` lost on single-file
+    just availability — a grep-shaped multi-file task doesn't work for this,
+    since the hook never gates `Grep` at all, only a full `Read`/`cat`.
+    **Designed to force real `sf` usage; measured outcome — `sf` lost on single-file
     comprehension — is in
     [`results/2026-07-02-t4-packagist-forced.md`](./results/2026-07-02-t4-packagist-forced.md).**
   - `t5_dispatch` — map the CLI's command-dispatch architecture across 13
@@ -100,7 +97,7 @@ bash judge.sh
 bash aggregate.sh
 
 # full study (real cost — a deliberate decision, not a default):
-bash run.sh            # 2 arms x 3 tasks x REPS reps
+bash run.sh            # 2 arms x TASKS x REPS reps
 bash judge.sh
 bash aggregate.sh
 ```
@@ -117,7 +114,7 @@ prints a CSV summary to stdout.
 | `TARGET_REPO` | `../sofia` | path to the `sofia-ctx/sofia` checkout under test |
 | `BASE_SHA` | `257718bfc4d6fee74322c24f4c90e8db02c99efa` | frozen commit worktrees are cut from (current `sofia-ctx/sofia` `main` HEAD at the time these tasks/rubrics were written — override only if you also re-verify the rubrics against the new commit) |
 | `ARMS` | `sf plain` | space-separated arms to run |
-| `TASKS` | `t1_calllog t2_composer t3_pricing` | space-separated task names (must have matching `tasks/<name>.task`/`.rubric`) |
+| `TASKS` | `t2_composer t3_pricing` | space-separated task names (must have matching `tasks/<name>.task`/`.rubric`; `t4_packagist`/`t5_dispatch` need `SF_HOOK_MODE=strict` to reproduce their published results, see below) |
 | `REPS` | `5` | repeats per (arm × task) |
 | `REP_START` | `1` | first rep index to run — resume a partial run (e.g. run rep 1 as a pilot, then `REP_START=2` to finish) without redoing completed reps |
 | `MODEL` | `sonnet` | model, fixed across both arms |

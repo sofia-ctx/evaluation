@@ -1,7 +1,8 @@
 # t4_packagist A/B: does `sf` earn its tokens once it's actually used?
 
-A follow-up to the **invalid** [`t1_calllog` run](./2026-07-02-t1-calllog.md).
-That run tried to measure `sf` vs `plain` on a multi-file comprehension task,
+A follow-up to an earlier, **invalid** attempt (`t1_calllog`, not published —
+it measured nothing, see below). That attempt tried to measure `sf` vs `plain`
+on a multi-file comprehension task,
 but `sf` was **never invoked** in any of the three `sf`-arm reps: the task was
 grep-shaped, and the `sf hook pre` PreToolUse hook only gates a *full*
 `Read`/`cat` of a big source file — it never touches `Grep` (deliberate, for

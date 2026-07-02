@@ -35,7 +35,7 @@ TARGET_REPO="${TARGET_REPO:-../sofia}"
 BASE_SHA="${BASE_SHA:-257718bfc4d6fee74322c24f4c90e8db02c99efa}"
 MODEL="${MODEL:-sonnet}"
 ARMS="${ARMS:-sf plain}"
-TASKS="${TASKS:-t1_calllog t2_composer t3_pricing}"
+TASKS="${TASKS:-t2_composer t3_pricing}"
 REPS="${REPS:-5}"
 # First rep index to run (default 1). Lets a partial run resume without
 # redoing completed reps — e.g. run rep 1 as a pilot, inspect it, then
