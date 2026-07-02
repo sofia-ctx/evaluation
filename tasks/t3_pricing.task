@@ -1,0 +1,11 @@
+In `internal/cc/pricing.go`, add a price entry for the model id
+`claude-haiku-5` to the `modelPrices` map: input $1.20 / 1M tokens, output
+$6.00 / 1M tokens.
+
+Requirements:
+- reuse the existing `cachePrice(input, output)` helper already used by
+  every other entry in the map — do not hand-roll a `ModelPrice{...}`
+  literal or recompute the cache-write/cache-read multipliers yourself;
+- match the existing map entries' style (quoted model id, aligned via
+  gofmt);
+- change only this file, and keep it syntactically valid Go.

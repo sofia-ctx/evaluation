@@ -1,0 +1,42 @@
+Task: summarise usage of the `calllog` tracker pattern across
+`internal/cc/` and `internal/common/` (sofia-ctx/sofia, frozen at BASE_SHA).
+
+Reference facts (frozen, verified by reading the real files):
+
+- Exactly 22 non-test `.go` files call `calllog.Start(...)`:
+  internal/cc/bash.go, internal/cc/candidates.go, internal/cc/ls.go,
+  internal/cc/prompts.go, internal/cc/resume.go, internal/cc/show.go,
+  internal/cc/value.go, internal/common/changed/changed.go,
+  internal/common/code/code.go, internal/common/composer/check.go,
+  internal/common/composer/composer.go, internal/common/composer/show.go,
+  internal/common/doctor/doctor.go, internal/common/github/branches.go,
+  internal/common/github/github.go, internal/common/github/pr.go,
+  internal/common/grep/scan.go, internal/common/gripe/gripe.go,
+  internal/common/hook/cmd.go, internal/common/packagist/packagist.go,
+  internal/common/packagist/release.go, internal/common/vue/routes.go,
+  internal/common/worktrees/worktrees.go.
+  (7 under internal/cc/, 15 under internal/common/.)
+- All 22 files hand output to the tracker via `tracker.RecordOutput(cw)` (a
+  `*calllog.Counter` passed as/wrapping the writer) before calling `Finish`.
+  None of them call `SetOutputBytes` or `SetOutputTokens` directly — those
+  two setters exist on `Tracker` but the only real call site anywhere in the
+  repo is a test fixture (`internal/calllog/calllog_test.go`), not any
+  command file.
+- `calllog.Track(...)` (the package-level `Start`+closure+`Finish` helper) is
+  defined in internal/calllog/calllog.go but has zero call sites anywhere
+  else in the repository — no command file uses it.
+
+Criteria:
+- File list: at least 18 of the 22 files correctly identified as calling
+  `calllog.Start`, with plausible/correct paths, and no more than 2
+  fabricated files that don't actually call it.
+- Output method: correctly states that (nearly) all identified files use
+  `RecordOutput`, not `SetOutputBytes`/`SetOutputTokens` (an answer claiming
+  widespread direct use of the setters is wrong).
+- `Track` helper: correctly states it is unused by any command file (or at
+  minimum does not claim it is a commonly-used pattern).
+- No files were modified (diff must be empty).
+
+PASS if: file list meets its bar AND the RecordOutput claim is correct AND
+the Track-is-unused claim is correct AND no files were modified.
+Otherwise FAIL. score 0-100 = fraction of the above criteria satisfied.

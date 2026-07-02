@@ -1,0 +1,40 @@
+Task: add a `License` field to the `Detail` struct in
+`internal/common/composer/show.go` (sofia-ctx/sofia, frozen at BASE_SHA).
+
+File style (frozen, verified by reading the real file). The struct before
+the change:
+
+  type Detail struct {
+      Name       string `json:"name"`
+      Dir        string `json:"dir"`
+      Version    string `json:"version"`
+      Type       string `json:"type"`
+      PHP        string `json:"php"`
+      PHPStan    string `json:"phpstan"`
+      Namespace  string `json:"namespace,omitempty"`
+      Scripts    []kv   `json:"scripts,omitempty"`
+      Require    []kv   `json:"require,omitempty"`
+      RequireDev []kv   `json:"require_dev,omitempty"`
+  }
+
+Every field is a plain exported Go struct field (no getters/setters
+anywhere in this file) with a single backtick `json:"..."` tag; optional-ish
+string fields (`Namespace`) use `,omitempty`.
+
+Criteria:
+- A new field named `License` of type `string` exists in `Detail`.
+- Its json tag is exactly `json:"license,omitempty"` (accept trivial
+  reordering, but `omitempty` must be present — a bare `json:"license"`
+  without omitempty is a style miss).
+- STYLE: declared as a plain exported struct field like the others — NOT as
+  a method, NOT with an added getter/setter, NOT unexported. A getter/setter
+  or unexported field is a style violation and is a FAIL.
+- Only `internal/common/composer/show.go` was changed; no other file
+  touched, no new tests added, no population/parsing logic added.
+- The file is valid Go: `go vet` on the changed package reports no errors
+  attributable to this edit (check the provided go vet output; an empty/
+  clean result for this file counts as passing).
+
+PASS if: the field exists with the correct type and tag, in the correct
+style, only this file changed, and the file is valid Go. Otherwise FAIL.
+score 0-100 = fraction of the above criteria satisfied.

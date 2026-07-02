@@ -1,0 +1,12 @@
+In `internal/common/composer/show.go`, add a new field `License` to the
+`Detail` struct:
+
+- type `string`;
+- JSON tag `json:"license,omitempty"`;
+- declare it in the SAME STYLE as the struct's other fields — first look at
+  how the existing fields (e.g. `Namespace`) are declared and match that
+  exactly (exported field name, gofmt-aligned tag block, tag conventions).
+
+Don't add anything else: no parsing/population logic, no tests, no changes
+to any other file — just the field. Make sure the file stays valid Go
+(gofmt/go vet clean).

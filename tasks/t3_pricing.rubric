@@ -1,0 +1,26 @@
+Task: add a `claude-haiku-5` entry to `modelPrices` in
+`internal/cc/pricing.go` (sofia-ctx/sofia, frozen at BASE_SHA).
+
+Context (frozen, verified by reading the real file): `modelPrices` is a
+`map[string]ModelPrice` where every entry is written as
+`"<model-id>": cachePrice(input, output)`; `cachePrice(input, output)`
+derives `CacheWrite = input*1.25` and `CacheRead = input*0.1` internally —
+no entry in the file constructs a `ModelPrice{...}` literal by hand except
+inside `cachePrice` itself and the zero-value `ModelPrice{}` returned by
+`priceFor` on a miss. `claude-haiku-5` does not already exist in the table
+(the closest existing key is `claude-haiku-4-5`, priced at 1.00/5.00).
+
+Criteria:
+- A new map entry with key `"claude-haiku-5"` exists in `modelPrices`.
+- Its value is a call to `cachePrice(1.20, 6.00)` (accept `1.2`/`6` — same
+  numeric value; input must be 1.20 and output must be 6.00).
+- It reuses `cachePrice(...)` — does NOT hand-construct a `ModelPrice{...}`
+  literal with manually computed `CacheWrite`/`CacheRead` fields.
+- Only `internal/cc/pricing.go` was changed (no edits to pricing_test.go or
+  any other file, no new functions added).
+- The file is valid Go: `go vet` reports no errors attributable to this
+  edit.
+
+PASS if: the entry exists with the correct key and values, uses
+`cachePrice`, only this file changed, and the file is valid Go. Otherwise
+FAIL. score 0-100 = fraction of the above criteria satisfied.
