@@ -90,7 +90,7 @@ run_one() {
   fi
   local taskfile="$HERE/tasks/$task.task"
   if [ ! -f "$taskfile" ]; then
-    echo "  ! no task file: $taskfile"; git -C "$TARGET_REPO" worktree remove -q --force "$wt" 2>/dev/null; return 1
+    echo "  ! no task file: $taskfile"; git -C "$TARGET_REPO" worktree remove --force "$wt" >/dev/null 2>&1; return 1
   fi
   local prompt; prompt="$(cat "$taskfile")"
 
@@ -133,7 +133,7 @@ run_one() {
   wall_ms=$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%d", (b-a)*1000}')
   printf '{"arm":"%s","task":"%s","rep":%s,"rc":%s,"wall_ms":%s,"sid":"%s"}\n' \
     "$arm" "$task" "$rep" "$rc" "$wall_ms" "$sid" >"$stem.meta"
-  git -C "$TARGET_REPO" worktree remove -q --force "$wt" 2>/dev/null
+  git -C "$TARGET_REPO" worktree remove --force "$wt" >/dev/null 2>&1
   echo "  done $arm/$task/$rep  rc=$rc  wall=${wall_ms}ms  cost=\$$cost  sid=$sid"
 }
 
