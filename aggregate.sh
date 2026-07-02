@@ -35,7 +35,7 @@ done
 
 echo "records -> $rec  ($(wc -l <"$rec" | tr -d ' ') runs)"
 echo
-jq -s '
+jq -rs '
   def median: sort | if length==0 then null
     elif length%2==1 then .[(length/2|floor)]
     else ((.[length/2-1]+.[length/2])/2) end;
