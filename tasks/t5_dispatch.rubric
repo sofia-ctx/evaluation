@@ -1,0 +1,126 @@
+Task: map the sf CLI command-dispatch architecture across 13 files / 12
+packages (sofia-ctx/sofia, frozen at BASE_SHA). Structural comprehension —
+no edits expected.
+
+Reference facts (frozen, verified by reading the real files at BASE_SHA):
+
+1) Dispatch spine (the call chain, process start → logic → telemetry):
+   - `cmd/sf/main.go` is tiny: `main()` calls
+     `calllog.Run(cli.RootCmd, "")` and, on error, prints "error:" to stderr
+     and exits 1.
+   - `calllog.Run(root *cobra.Command, fallbackTool string) error` executes
+     the command tree via `root.ExecuteC()`, resolves the canonical tool name
+     from the executed command's path (`toolName(executed.CommandPath())`,
+     falling back to `fallbackTool`), then calls `Finalize(name, err)` to
+     close/flush the telemetry entry, and returns the command error to
+     main() (which prints/exits).
+   - The root command `cli.RootCmd` is a cobra command whose subcommands are
+     attached in `internal/cli/root.go`'s `init()`.
+   - A feature's cobra command (built by its `NewCommand()`) has subcommands
+     whose `RunE` closures call the feature's logic entry function (e.g.
+     `Run(Options{...}, os.Stdout)`).
+   - The invocation is logged once, at the end, by the calllog span the
+     feature opened (see fact 4) — not per file.
+
+2) Registration (internal/cli/root.go init()):
+   - Each feature package exposes a `NewCommand() *cobra.Command`; root.go's
+     init() calls each and attaches it to `RootCmd`.
+   - Four help groups (ID → members):
+       context : code (commoncode), grep, changed, cc
+       php     : composer, packagist, github
+       projects: vue
+       infra   : doctor, gripe, history, worktrees, mcpserver
+   - `hook.NewCommand()` is added OUTSIDE the groups (ungrouped, hidden
+     plumbing). Help/completion commands are put in the infra group.
+   - (root.go also installs a flag-error hint via SetFlagErrorFunc — not
+     required for the answer.)
+
+3) Per-feature contract (entry signature | options struct fields | Collect):
+   Uniform pattern: `func Run(opts Options, w io.Writer) error`, taking a
+   package-local `Options` struct and writing to an io.Writer.
+   The ONE deliberate entry-name deviation: **github** uses
+   `func RunCI(opts Options, w io.Writer) error` (not `Run`).
+   Every Options struct has a `Format string` field (the shared output-format
+   field) — that is the one field they all share.
+
+   - code      : Run(Options, io.Writer) error;
+                 Options{Inputs []string, Format string, ExportedOnly bool,
+                 API bool, Symbol string}; no Collect.
+   - grep      : Run(Options, io.Writer) error;
+                 Options{Root, Patterns []string, Format, CaseSensitive,
+                 WordBound, Regex, Exts []string, ExtraIgnore []string,
+                 MaxPerPattern int}; no Collect (has a PatternResult type).
+   - changed   : Run(Options, io.Writer) error;
+                 Options{Root, Range, Staged bool, Symbols bool, Format};
+                 Collect(opts Options) (*Result, error).
+   - composer  : Run(Options, io.Writer) error; Options{Root, Format};
+                 Collect(root string) ([]Pkg, error).
+   - packagist : Run(Options, io.Writer) error;
+                 Options{Root, Format, Offline bool};
+                 Collect(root string, offline bool, fetch fetcher)
+                 ([]Status, error).
+   - github    : **RunCI**(Options, io.Writer) error;
+                 Options{Root, Target, Format, Limit int, Watch bool,
+                 Timeout time.Duration, Poll time.Duration}; no Collect.
+   - worktrees : Run(Options, io.Writer) error; Options{Www, Format};
+                 Collect(opts Options) (*Result, error).
+   - doctor    : Run(Options, io.Writer) error; Options{Format} (smallest —
+                 one field); Collect(_ Options) (*Result, error).
+   - vue       : Run(Options, io.Writer) error; Options{Root, File, Format};
+                 no Collect.
+   - gripe     : Run(Options, io.Writer) error;
+                 Options{Message, Format, Limit int}; no Collect.
+   Collect deviation: changed / worktrees / doctor return `(*Result, error)`
+   (a single aggregate); composer returns `([]Pkg, error)` and packagist
+   `([]Status, error)` (slices); code / grep / vue / gripe / github have no
+   Collect. grep's Options is the largest (9 fields); doctor's the smallest.
+
+4) Shared telemetry span (internal/calllog):
+   - The type is `calllog.Tracker`. Lifecycle: `t := calllog.Start(tool,
+     args)` opens the span; the feature wraps its output writer in a
+     `calllog.Counter` (`cw := &calllog.Counter{W: w}`) so bytes/tokens are
+     counted as it writes, then calls `t.RecordOutput(cw)` (usually
+     deferred/near the end) to attach those counts; `t.Finish(err)` closes it
+     and appends the log entry.
+   - This pattern (Start → Counter+RecordOutput → Finish) is uniform across
+     ALL 10 feature packages above.
+   - github additionally uses the package-level `calllog.Track(...)` helper
+     (Start+closure+Finish) in one spot, on top of the Start/Finish usage —
+     it is the only one of these that touches `Track`.
+
+Criteria (score 0-100 = fraction satisfied; PASS if ALL of the starred bars
+are met):
+
+- (*) Q1 spine: correctly states the chain main → `calllog.Run(RootCmd, "")`
+  → `RootCmd.ExecuteC()` → the matched feature command's `RunE` → the
+  feature's logic entry function, AND that `calllog.Run` both executes the
+  tree and logs the invocation once (via Finalize) before returning the error
+  to main. Getting the wrapper backwards (e.g. claiming main calls a feature
+  directly, or that logging happens per-file) is wrong.
+- (*) Q3 contract — the load-bearing structural bar:
+  - correctly gives the uniform `Run(opts Options, w io.Writer) error` entry
+    for AT LEAST 8 of the 10 feature packages, AND
+  - correctly flags **github**'s entry as `RunCI` (the one non-`Run` entry),
+    AND
+  - lists the Options struct fields for AT LEAST 6 of the 10 packages with
+    substantially correct field sets (a couple of missed/extra fields per
+    struct is fine; wholesale-invented structs are not), AND
+  - correctly captures the `Collect` distinction: at least that some packages
+    (changed/worktrees/doctor) return `*Result` while composer/packagist
+    return a slice, and that several packages have no Collect.
+  An answer that only lists function/type NAMES without the struct fields, or
+  that claims a uniform Collect signature everywhere, or that misses the
+  github/RunCI deviation entirely, does NOT meet this bar.
+- (*) Q4 telemetry: correctly identifies `calllog.Tracker` as the per-command
+  span and describes the Start → (Counter wrapping the writer +) RecordOutput
+  → Finish lifecycle as uniform across the feature packages. Naming the
+  Counter's role (counting output bytes/tokens) is expected; the specific
+  `calllog.Track` note for github is a nice-to-have, not required.
+- Q2 registration: correctly describes the `NewCommand()`-per-package
+  registration and names the group structure (the four group IDs and roughly
+  the right membership; hook being ungrouped/hidden is a nice-to-have). This
+  is scored but is NOT a starred pass-gate on its own.
+- No files were modified (git diff must be empty). Any diff is a FAIL.
+
+PASS if the three starred bars (Q1, Q3, Q4) are met AND the diff is empty.
+Otherwise FAIL. score 0-100 = fraction of all the above satisfied.

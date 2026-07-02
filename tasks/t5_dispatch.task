@@ -1,0 +1,58 @@
+Map the command-dispatch architecture of the `sf` CLI (sofia-ctx/sofia).
+This is a structural comprehension task spanning many files: you need the
+*shape* of each file (its types, struct fields, and function/method
+signatures) and how the pieces connect — you do NOT need to understand the
+internal algorithms (retry logic, git plumbing, parsing) inside any function
+body.
+
+The files in scope (13, across 12 packages):
+
+  Spine:
+    cmd/sf/main.go
+    internal/cli/root.go
+    internal/calllog/calllog.go
+  One logic file per feature package:
+    internal/common/code/code.go
+    internal/common/grep/scan.go
+    internal/common/changed/changed.go
+    internal/common/composer/composer.go
+    internal/common/packagist/packagist.go
+    internal/common/github/github.go
+    internal/common/worktrees/worktrees.go
+    internal/common/doctor/doctor.go
+    internal/common/vue/routes.go
+    internal/common/gripe/gripe.go
+
+Produce a precise technical map answering all four:
+
+1) The dispatch spine. Trace the exact call chain that takes `sf <cmd>` from
+   process start to a feature's logic and back out through telemetry. Name
+   each hop: what `cmd/sf/main.go` calls, what that wrapper
+   (`calllog.Run(root, fallbackTool)`) does with the root command, how a
+   feature's cobra command reaches its logic entry function, and how the
+   invocation gets logged once at the end.
+
+2) Registration. Describe how `internal/cli/root.go` assembles the command
+   tree: the per-package constructor pattern it calls, and the help groups it
+   organises the subcommands into (list the group IDs and which feature
+   commands go in each). Note anything registered outside those groups.
+
+3) The per-feature contract. For each of the 10 feature packages above, give:
+   (a) the exact signature of the logic entry function the command's RunE
+   calls; (b) the name and fields (with types) of its input options struct;
+   (c) whether it also exposes a `Collect(...)` function and, if so, what that
+   returns. State the uniform pattern that holds across most packages AND call
+   out the deliberate deviations from it (there is one package whose entry
+   function is not named `Run`; the `Collect` return type is not the same
+   across the packages that have one; the options structs differ in size, and
+   there is exactly one field they all share).
+
+4) The shared telemetry span. Identify the single type each feature uses to
+   log its own invocation and describe its lifecycle — which method opens the
+   span, how the command's output writer is wired in so bytes/tokens get
+   counted, and which method closes it. Confirm whether this pattern is
+   uniform across all 10 feature packages, and note any package that uses an
+   additional convenience helper on top of it.
+
+Answer compactly as a numbered list (a small table for question 3 is fine).
+Do NOT modify any files — this is an investigation and summary task only.
