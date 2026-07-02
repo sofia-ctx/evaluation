@@ -52,10 +52,13 @@ in `sofia-ctx/sofia`.
   - `t4_packagist` — comprehend the retry/backoff/version-selection logic of
     one ~12KB file (`internal/common/packagist/packagist.go`) well enough to
     answer four questions about its actual behaviour. A full-file `Read` is
-    the obvious first move, so under `SF_HOOK_MODE=strict` the `sf` arm's
-    PreToolUse hook actually fires and pushes the agent onto
-    `sf code`/`sf code <Symbol>` — the design that makes the treatment arm
-    differ by tool *usage*, not just availability. **Favors `sf`.**
+    the obvious first move — exactly what `SF_HOOK_MODE=strict`'s PreToolUse
+    hook denies — so the `sf` arm is routed onto `sf code`/`sf code <Symbol>`.
+    This is the task that makes the treatment arm differ by tool *usage*, not
+    just availability (the gap that invalidated `t1_calllog`). **Designed to
+    force real `sf` usage; measured outcome — `sf` lost on single-file
+    comprehension — is in
+    [`results/2026-07-02-t4-packagist-forced.md`](./results/2026-07-02-t4-packagist-forced.md).**
 - **N repeats** per (arm × task) → median (an LLM is not deterministic).
 - Isolation: every run is a fresh `git worktree --detach` off a frozen
   `BASE_SHA`, removed after. Model is fixed across both arms (`MODEL`,
