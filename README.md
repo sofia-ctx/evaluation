@@ -40,11 +40,22 @@ in `sofia-ctx/sofia`.
   [`tasks/`](./tasks)):
   - `t2_composer` — add one optional field to a Go struct in
     `internal/common/composer/show.go`, matching the file's existing style.
-    Single file, moderate. **Neutral.**
+    Single file, moderate, needing only a small part of it — the shape
+    `sf code <file> <Symbol>` is nominally built for. Run with
+    `SF_HOOK_MODE=strict` so the arms differ by tool *usage*. A-priori guess
+    was **Neutral**; **measured outcome — `sf` lost even on genuinely
+    targeted point-read usage (+29.1% $, +44.6% tokens) — is in
+    [`results/2026-07-02-t2-composer.md`](./results/2026-07-02-t2-composer.md).**
   - `t3_pricing` — add one map entry to a 68-line file
     (`internal/cc/pricing.go`), reusing an existing helper. A plain `Read` of
     the whole (small) file is already cheap; a structural-summary-then-body
-    round trip is extra ceremony for no win. **Favors `plain`.**
+    round trip is extra ceremony for no win. Run with the default `nudge`
+    hook mode — the file is under the hook's size gate either way, so the
+    hook is a non-factor by design. **Favors `plain`; measured outcome — `sf`
+    lost (+9.0% $, +29.2% tokens); the hook never engaged (confirmed
+    mechanically and live), but the agent reached for `sf code` anyway on
+    2 of 3 reps — over-application, not hook-forcing — is in
+    [`results/2026-07-02-t3-pricing.md`](./results/2026-07-02-t3-pricing.md).**
   - `t4_packagist` — comprehend the retry/backoff/version-selection logic of
     one ~12KB file (`internal/common/packagist/packagist.go`) well enough to
     answer four questions about its actual behaviour. A full-file `Read` is
@@ -114,7 +125,7 @@ prints a CSV summary to stdout.
 | `TARGET_REPO` | `../sofia` | path to the `sofia-ctx/sofia` checkout under test |
 | `BASE_SHA` | `257718bfc4d6fee74322c24f4c90e8db02c99efa` | frozen commit worktrees are cut from (current `sofia-ctx/sofia` `main` HEAD at the time these tasks/rubrics were written — override only if you also re-verify the rubrics against the new commit) |
 | `ARMS` | `sf plain` | space-separated arms to run |
-| `TASKS` | `t2_composer t3_pricing` | space-separated task names (must have matching `tasks/<name>.task`/`.rubric`; `t4_packagist`/`t5_dispatch` need `SF_HOOK_MODE=strict` to reproduce their published results, see below) |
+| `TASKS` | `t2_composer t3_pricing` | space-separated task names (must have matching `tasks/<name>.task`/`.rubric`; `t2_composer`/`t4_packagist` need `SF_HOOK_MODE=strict` to reproduce their published results, `t5_dispatch` uses the default `nudge`, see below) |
 | `REPS` | `5` | repeats per (arm × task) |
 | `REP_START` | `1` | first rep index to run — resume a partial run (e.g. run rep 1 as a pilot, then `REP_START=2` to finish) without redoing completed reps |
 | `MODEL` | `sonnet` | model, fixed across both arms |
