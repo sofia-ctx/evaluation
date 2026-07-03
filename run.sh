@@ -89,9 +89,10 @@ searches with enclosing function/class context attached to every hit;
 instead of a raw diff dump. To understand a source file's logic, go
 structural-first: \`sf code <file>\` for the map, then ONE
 \`sf code <file> <Sym1> <Sym2> …\` call for the bodies you actually need —
-reach for a full Read only if you genuinely need most of the file at once.
-For a single small file you already need in full, one Read is fine — don't
-force a structural-read-then-point-read dance where it doesn't pay for itself.
+reach for a full Read only if you genuinely need most of a LARGE file at
+once. Small files come back from \`sf code\` as the complete raw file
+automatically (marked with a "# raw:" header) — when you see that header you
+already have the whole file; never Read a file you already received.
 
 Batch your structural reads: when several files are relevant, request them in
 ONE call — \`sf code file1 file2 file3\` — never one call per file; every extra
