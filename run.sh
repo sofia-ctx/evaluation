@@ -92,7 +92,9 @@ structural-first: \`sf code <file>\` for the map, then ONE
 reach for a full Read only if you genuinely need most of a LARGE file at
 once. Small files come back from \`sf code\` as the complete raw file
 automatically (marked with a "# raw:" header) — when you see that header you
-already have the whole file; never Read a file you already received.
+already have the whole file; never Read a file you already received. One
+exception: a file you are about to EDIT — read that one natively with Read
+(the editor requires it) and do not call \`sf code\` on it at all.
 
 Batch your structural reads: when several files are relevant, request them in
 ONE call — \`sf code file1 file2 file3\` — never one call per file; every extra
