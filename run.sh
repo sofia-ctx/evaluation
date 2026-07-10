@@ -85,6 +85,8 @@ files (.go/.php/.ts/.tsx/.vue) — prefer it: \`sf code <file>\` prints a
 file's structure without function bodies; \`sf code <file> <Symbol1> [Symbol2 …]\`
 prints one or several symbols' full source in one call; \`sf grep '<pattern>'\`
 searches with enclosing function/class context attached to every hit;
+\`sf refs <symbol>\` finds where a symbol is defined and used across the whole
+tree, each hit carrying its enclosing function, in one call;
 \`sf changed [ref]\` summarises a git diff by file/churn/category/touched-symbols
 instead of a raw diff dump. To understand a source file's logic, go
 structural-first: \`sf code <file>\` for the map, then ONE

@@ -1,0 +1,25 @@
+Map every use of the `calllog.Counter` type across the `sf` CLI codebase
+(sofia-ctx/sofia, frozen at BASE_SHA). This is a usage-comprehension task
+spanning many files: for each use you need the file, the enclosing function,
+and what the use is doing — you do NOT need to understand the internals of the
+enclosing functions.
+
+Produce:
+
+1) The uniform pattern. State the single construction pattern that holds for
+   the great majority of `calllog.Counter` call sites: the exact expression,
+   where in its function it appears, and what its `W` field is wired to in
+   that common case.
+
+2) Every deviation from that uniform pattern. For each, give the file, the
+   enclosing function, and precisely how it differs from the common case.
+   (There are a handful — a complete answer finds all of them, including where
+   the type is defined and how the tests build it.)
+
+3) A count: how many distinct call sites CONSTRUCT a `calllog.Counter`
+   (an `&calllog.Counter{...}` or `&Counter{...}` literal), and separately the
+   total number of references to the type (its definition, its methods, every
+   construction, and comment mentions).
+
+Answer compactly as a short numbered list; a small table for the deviations is
+fine. Do NOT modify any files — this is an investigation and summary task only.

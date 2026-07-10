@@ -1,0 +1,74 @@
+Task: map every use of the `calllog.Counter` type across sofia-ctx/sofia
+(frozen at BASE_SHA). Usage comprehension across ~20 files — no edits expected.
+
+Reference facts (frozen, verified by reading the real files at BASE_SHA via
+`sf refs Counter --max 100`): 1 definition + 31 uses = 32 references total.
+
+1) Uniform pattern (holds for 22 of the call sites):
+   `cw := &calllog.Counter{W: w}` — created near the TOP of a feature's logic
+   entry function `func Run(opts ..., w io.Writer) error` (or a RunX sibling),
+   right after the calllog span is opened, wiring the Counter's `W` field to
+   that function's `w io.Writer` output parameter so emitted bytes/tokens are
+   metered. The 22 uniform sites (file → enclosing func):
+     internal/cc/bash.go:179 runBash
+     internal/cc/candidates.go:241 runCandidates
+     internal/cc/ls.go:99 runLs
+     internal/cc/prompts.go:65 runPrompts
+     internal/cc/resume.go:81 runResume
+     internal/cc/show.go:79 runShow
+     internal/cc/value.go:249 runValue
+     internal/common/changed/changed.go:58 Run
+     internal/common/code/code.go:64 Run
+     internal/common/composer/check.go:72 RunCheck
+     internal/common/composer/composer.go:78 Run
+     internal/common/composer/show.go:58 RunShow
+     internal/common/doctor/doctor.go:90 Run
+     internal/common/github/branches.go:123 RunBranches
+     internal/common/github/github.go:98 RunCI
+     internal/common/github/github.go:111 RunCI   (second Counter in RunCI)
+     internal/common/github/pr.go:129 RunPR
+     internal/common/grep/scan.go:91 Run
+     internal/common/gripe/gripe.go:45 record
+     internal/common/packagist/packagist.go:66 Run
+     internal/common/packagist/release.go:64 RunRelease
+     internal/common/vue/routes.go:64 Run
+     internal/common/worktrees/worktrees.go:83 Run
+
+2) The deviations that a complete answer must call out:
+   a) Definition + methods (internal/calllog/calllog.go): the type is DEFINED
+      here — `type Counter struct` (line 252, fields W io.Writer, Count, Tokens
+      — the "W plus two accumulators" shape); and two methods take/receive it —
+      `func (t *Tracker) RecordOutput(c *Counter)` (line 242, Counter as a
+      parameter) and `func (c *Counter) Write(p []byte) (int, error)` (line
+      258, the io.Writer impl). Not constructions. (Lines 240 and 247 are
+      comment mentions.)
+   b) internal/common/hook/cmd.go:80 runPre — `cw := &calllog.Counter{W:
+      cmd.OutOrStdout()}`: W is wired to a cobra command's `cmd.OutOrStdout()`,
+      NOT a plain `w io.Writer` parameter (runPre is a cobra RunE, not a
+      Run(opts, w) logic function).
+   c) internal/common/github/github.go:238 runCIAggregate — the ONLY call site
+      whose enclosing function also receives a `tracker *calllog.Tracker`
+      parameter; it still constructs its own `cw := &calllog.Counter{W: w}`.
+   d) Tests (internal/calllog/calllog_test.go): non-production construction —
+      `&Counter{W: &buf}` (line 62, TestCounter, wraps a bytes.Buffer) and
+      `&Counter{Count: 123, Tokens: 45}` (line 88, TestRecordOutput, sets the
+      accumulator fields directly rather than wrapping a writer).
+
+3) Counts:
+   - Constructions (`&(calllog.)Counter{...}` literals): 24 — the 22 uniform
+     sites + hook/cmd.go + the two test constructions. (runCIAggregate is one
+     of the 22.) Accept 22–24 with correct reasoning about whether tests count.
+   - Total references: 32 (1 def + 31 uses), matching `sf refs Counter`.
+
+Scoring guidance:
+- A top answer states the uniform pattern (expression + placement + `W: w`),
+  finds ALL of deviations (a)–(d), and gives counts consistent with the facts
+  (total 32; constructions ~24). Getting the enclosing function right for the
+  two structural deviations (hook `cmd.OutOrStdout()`, runCIAggregate's
+  tracker) is the discriminating signal — they are easy to miss without
+  per-site enclosing context.
+- Penalize: missing a deviation class (esp. b or c), claiming perfect
+  uniformity, wrong total-reference count, or inventing sites not in the list.
+- Do NOT reward or penalize either arm for HOW it gathered the facts (a single
+  refs query vs. grep + reads); score only the correctness/completeness of the
+  produced map.
