@@ -167,3 +167,11 @@ Mechanism across the axis: `sf refs` collapses the plain baseline's read-fan. A 
 **Positioning consequence:** `sf` pays off across the **capable range** — biggest for the mid-tier workhorse (sonnet-class) you run high-volume coding on, still a real (smaller) win on a frontier model. It only *backfires* on a model too weak to drive it, so a plugin/hook that force-nudges a **weak** agent toward structural tools can cost more than it saves — don't make it blanket "always on" for the cheapest models. The `MODEL` axis is the per-deployment check.
 
 Caveats: one task, n=3, judge noisy (±20–45 — verdicts rest on turns/cost, which are clean per model). The shape is three points; direction (weak-loss / mid-big-win / strong-small-win) is a large, mechanistically-explained spread, but the exact peak/breakeven isn't pinned. Total model-axis spend: opus ≈ $3.7 + haiku ≈ $1.1.
+
+### fable — 4th axis point (2026-07-11)
+
+**Pre-registered before the run.** `claude-fable-5`, a Claude model of unknown tier relative to haiku/sonnet/opus — this run *places* it on the curve rather than confirming a prediction. Objective read (per the tone note): report where it lands and whether sf helps it, without pre-judging either way. Same task/BASE_SHA/arms, `MODEL=fable`, n=3 (reps 30–32). Primary = sf vs plain by billed cost + turns (the metrics that are clean per model); the sf `calls.jsonl` trace tells us whether fable drives sf competently (like sonnet/opus) or flails (like haiku) — which, given the mechanism, predicts the sign.
+
+#### Results
+
+(appended after the run)
