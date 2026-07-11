@@ -117,6 +117,22 @@ Same task `t5_refs`, same BASE_SHA=257718b, same preambles/arms — only `MODEL=
 ### Stop-loss (opus is ~5× sonnet's per-token price)
 n=1 each arm FIRST; inspect the sf trace (does opus fan out after `sf refs`?). Escalate to n=3 ONLY if the n=1 direction is worth confirming AND the cost is acceptable — flag spend before escalating. No claim beyond "trace + direction" at n=1.
 
-### Results
+### Results (2026-07-11, MODEL=opus, n=3/arm, reps 10–12; sonnet baseline = the n=3 above)
 
-(appended after the opus run)
+| median n=3 | opus sf | opus plain | (sonnet sf) | (sonnet plain) |
+| --- | ---: | ---: | ---: | ---: |
+| turns | **11**  [11,11,14] | **13**  [13,12,13] | 18 | 42 |
+| cost $ | 0.550 | 0.643 | 0.557 | 0.971 |
+| cache_read (integral) | 207K | **188K** | 587K | 1226K |
+| judge | 70  [90,70,38] | 38  [38,38,*] | 48 | 38 |
+
+*judge is badly noisy here (opus sf rep10 scored 45 on the first pass, 90 on a re-judge of the same answer — ±45; one plain rep hit the judge's parse-fail fallback). Treat quality as "sf ≈ or somewhat better, both imperfect" and rest the verdict on the judge-independent metrics.* opus sf over-fetch across the 3 reps: 9 refs + 14 code + 3 grep ≈ 4.7 code re-reads/rep (sonnet: 6–16/rep).
+
+### Verdict — the refs win is MODEL-DEPENDENT and shrinks with model strength
+The turn-collapse that was **−57%** on sonnet (sf 18 vs plain 42) is **~−15% and near-parity on opus** (sf 11 vs plain 13), and the context integral is even slightly *higher* for opus-sf than opus-plain (207K vs 188K). Two compounding reasons, both confirming the benchmark's thesis:
+1. **opus's plain (grep) baseline is already efficient** — 13 turns / 188K, versus sonnet-plain's 42 turns / 1.23M. A strong model doesn't fan out with bare grep, so `sf refs` has almost no read-fan left to collapse.
+2. **opus over-fetches less in the sf arm too** — ~4.7 `sf code` re-reads/rep vs sonnet's 6–16; it trusts `sf refs` more. (This half is the direction the "develop the win" guidance null predicted couldn't be forced — a stronger model just does it.)
+
+**Strategic reading (first point on the MODEL axis):** `sf`'s value is **inversely proportional to model capability** on this probe. It buys the most for **weaker/cheaper agents** (sonnet — and by extension haiku), whose plain baseline over-fetches; for the **strongest** models (opus) the plain baseline is already lean, so `sf`'s structural tools are roughly break-even. Honest consequence for positioning: pitch `sf` as a token-economy lever for high-volume work on cheaper models, **not** as a universal win — on a top model the agent doesn't need the crutch. (Cost footnote: opus was *not* ~5× dearer per run — $0.55–0.64 vs sonnet's $0.56–0.97 — because its lower turn count offsets the higher per-token price.)
+
+Caveat: n=3, one task, one strong model. The direction (win shrinks as the model strengthens) is clean and mechanistically sound; the exact opus break-even point isn't pinned. Next axis point that would sharpen it: **haiku** (predict the *largest* refs win, since the weakest baseline fans out most). opus spend ≈ $3.7.
