@@ -154,24 +154,35 @@ Caveat: n=3, one task, judge noisy. Cost footnote: opus was *not* ~5× dearer pe
 
 Reporting the **billed cost** (bottom line) alongside turns, so one metric can't skew the read:
 
-| model | sf vs plain turns | sf vs plain cost | verdict |
-| --- | --- | --- | --- |
-| **haiku** (weak) | 30 vs 15 (**+100%**) | $0.19 vs $0.155 (**+22%**) | sf **LOSES** — too weak to drive the tools, it flails |
-| **sonnet** (mid) | 18 vs 42 (**−57%**) | $0.56 vs $0.97 (**−43%**) | sf **WINS big** — the sweet spot |
-| **opus** (strong) | 11 vs 13 (**−15%**) | $0.55 vs $0.64 (**−15%**) | sf **WINS (modest)** — cheaper, fewer turns, better answer |
+| model | sf turns | plain turns | sf cost | plain cost | sf vs plain | verdict |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| **haiku** | 30 | 15 | $0.19 | $0.155 | turns **+100%**, cost **+22%** | sf **LOSES** — can't drive the tools, flails |
+| **opus** | 11 | 13 | $0.55 | $0.64 | turns **−15%**, cost **−15%** | sf **WINS** (modest) — lean baseline, small fan to collapse |
+| **sonnet** | 18 | 42 | $0.56 | $0.97 | turns **−57%**, cost **−43%** | sf **WINS big** |
+| **fable** | 11 | 39 | $1.15 | $2.32 | turns **−72%**, cost **−50%** | sf **WINS biggest** — fanning baseline + drives sf cleanly + priciest model |
 
-Shape: an inverted-U in *magnitude* (rise to a sonnet peak, then decline), but **only the weak end goes negative** — sf is a real win on both sonnet (big) and opus (modest), and a loss only on haiku. On opus the sole metric against sf is the cache_read integral (+11%); every billed/behavioural axis (cost, turns, quality) favours it. So the earlier "parity / not needed on opus" was an over-negative read that over-weighted one non-billed metric.
+**sf wins on 3 of 4 models — and by a lot** (−43% to −50% cost on sonnet/fable). It loses only on haiku, the weakest.
 
-Mechanism across the axis: `sf refs` collapses the plain baseline's read-fan. A **weak** model can't wield the richer toolset (haiku flails: ~30 turns, ~4 productive sf calls/rep, mixing native Reads + sf, fumbling paths) → sf backfires. A **mid** model uses sf well and its plain baseline fans out hard (42 turns) → biggest win. A **strong** model still benefits (fewer turns, cheaper, better answer) but its plain baseline is already fairly lean (13 turns) → smaller win.
+The four points **break the tidy "capability inverted-U"** the first three suggested (fable drives sf as cleanly as opus yet wins *bigger than sonnet*). The win is better explained by **two independent factors**, not raw model rank:
+1. **Can the model drive the toolset?** haiku can't (flails: ~30 turns, ~4 productive sf calls/rep, native-Read/sf mixing, path fumbling) → sf backfires. Every other model can → sf helps.
+2. **Among competent models, the win size tracks how much the PLAIN baseline over-fetches.** opus's plain is already lean (13 turns) → little fan to collapse → −15%. sonnet (42) and fable (39) fan out hard → −43%/−50%. `sf refs` collapses exactly that fan.
 
-**Positioning consequence:** `sf` pays off across the **capable range** — biggest for the mid-tier workhorse (sonnet-class) you run high-volume coding on, still a real (smaller) win on a frontier model. It only *backfires* on a model too weak to drive it, so a plugin/hook that force-nudges a **weak** agent toward structural tools can cost more than it saves — don't make it blanket "always on" for the cheapest models. The `MODEL` axis is the per-deployment check.
+So `sf` pays off **wherever a competent model would otherwise fan out on a multi-file task** — i.e. most real coding models on real work; the exception is a model too weak to wield the tools.
 
-Caveats: one task, n=3, judge noisy (±20–45 — verdicts rest on turns/cost, which are clean per model). The shape is three points; direction (weak-loss / mid-big-win / strong-small-win) is a large, mechanistically-explained spread, but the exact peak/breakeven isn't pinned. Total model-axis spend: opus ≈ $3.7 + haiku ≈ $1.1.
+**Positioning consequence:** `sf` is a real, often large cost win (−43% to −50%) for competent models that fan out on multi-file work — sonnet and fable here — a smaller but real win on a model whose baseline is already lean (opus), and a **loss only on a model too weak to drive it** (haiku). Practical rule: default it **on** for the models you run real coding on; the one guardrail is not force-nudging the weakest agents toward structural tools (there it can cost more than it saves). The `MODEL` axis is the per-deployment check.
+
+Caveats: one task, n=3, judge noisy (±20–45 — verdicts rest on turns/cost, which are clean per model). Four points; the direction (loss only when the model can't drive the tools; otherwise a win scaling with how much the plain baseline fans out) is a large, mechanistically-explained spread, but exact break-even isn't pinned. Model-axis spend: opus ≈ $3.7 + haiku ≈ $1.1 + fable ≈ $10 (fable is the priciest model per run).
 
 ### fable — 4th axis point (2026-07-11)
 
 **Pre-registered before the run.** `claude-fable-5`, a Claude model of unknown tier relative to haiku/sonnet/opus — this run *places* it on the curve rather than confirming a prediction. Objective read (per the tone note): report where it lands and whether sf helps it, without pre-judging either way. Same task/BASE_SHA/arms, `MODEL=fable`, n=3 (reps 30–32). Primary = sf vs plain by billed cost + turns (the metrics that are clean per model); the sf `calls.jsonl` trace tells us whether fable drives sf competently (like sonnet/opus) or flails (like haiku) — which, given the mechanism, predicts the sign.
 
-#### Results
+#### Results (MODEL=fable, n=3, reps 30–32)
 
-(appended after the run)
+| median n=3 | fable sf | fable plain |
+| --- | ---: | ---: |
+| turns | **11**  [8,11,11] | **39**  [27,39,48] |
+| cost $ | **1.15** | **2.32** |
+| cache_read | 185K | 501K |
+
+**fable is the BIGGEST sf win on the axis: −72% turns, −50% cost.** Its plain arm fans out hard (39 turns, like sonnet's 42) yet it drives `sf` cleanly (11 turns, like opus) — the combination sf is built for. fable is also the priciest model per run ($1.1–2.7), so cutting the turn count saves the most *absolute* dollars. (Both arms ~35–40 on the noisy judge, both fail the hard rubric — quality comparable; verdict rests on turns/cost.)
