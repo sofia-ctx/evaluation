@@ -66,3 +66,38 @@ Auth smoke rc=0 (gate passed). One plain rep-1 was killed by a 600s timeout coll
 
 ### Consequence
 `refs.md` overstated the footer's pessimism: the footer is honest about the single call's bytes but structurally blind to the downstream read-fan refs removes. Update refs.md to cite this measured turn/cost collapse (−57% turns, −43% $ median vs a grep-fan baseline) instead of "unmeasured". No code change — refs already ships; this validates it.
+
+---
+
+## Follow-up (2026-07-11): can guidance widen the win?
+
+**Pre-registered BEFORE the re-run.** The n=3 diagnosis (`calls.jsonl` of a captured sf rep) showed the sf arm **over-fetched**: 2 `sf refs Counter` calls returned everything (all deviations are visible in the enclosing signature + hit text; the header gives the def/use totals), yet the agent then made ~8 redundant calls — 6 `sf code <file>` re-reads of hit files already labelled by refs, plus 2 `grep` calls to re-count constructions refs had already totalled. It fetched no function *bodies*. So `--bodies` is the wrong lever; the loss is **trust in the refs output**, addressable by guidance.
+
+### Change under test (guidance only — no binary change)
+Shipped guidance sharpened to state refs' self-sufficiency (`skills/sf-context/SKILL.md`, `internal/common/initcmd/agents_block.md`) and mirrored into the harness sf preamble (`run.sh`): *"After `sf refs`, that output IS the usage map — don't re-open each hit's file or grep to re-count; only `sf code <file> <func>` a body you actually need."*
+
+### Hypothesis / criteria
+Guidance pulls the sf arm's turns from the 18 median toward the refs-only floor (~3–6), widening the win vs the unchanged plain baseline (42). **win**: median sf turns(guided) < 18 materially (target ≤ ~10) with judge score not regressing (≥ 45). **null**: turns unchanged (~18) → the over-fetch is not guidance-addressable (agents don't obey the completeness note) — reported honestly, consistent with the program's finding that preamble nudges are fragile.
+
+### Design / stop-loss
+Only the **sf arm** re-runs (guidance can't touch the sf-less plain arm); compare to plain's frozen 42 and old-sf's 18. n=3, sonnet, same task/BASE_SHA. Budget ~$1.5. A clear null at n=3 → stop (don't tune the wording to win).
+
+### Results (2026-07-11, sf arm reps 5–7, guidance in the preamble)
+
+| sf arm | turns (median) | cost (median) | judge (median) |
+| --- | ---: | ---: | ---: |
+| old (no completeness note) | 18  [13,23,18] | $0.557 | 48 |
+| **guided** | **20**  [20,15,23] | **$0.844** | 38  [38,38,48] |
+| plain baseline (frozen) | 42 | $0.971 | 38 |
+
+Tool-call mix across the 3 guided reps: **50 `code` + 8 `refs` + 2 `grep`** ≈ 16.7 `code`/rep — the over-fetch did **not** drop (old diagnostic rep: ~8 `code` + 2 `refs` + 2 `grep`; if anything the structure re-reads went up).
+
+### Verdict — NULL for the guidance lever
+Guidance telling the agent "refs output IS the usage map, don't re-open" did **not** widen the win: guided turns median 20 ≈ old 18 (indistinguishable, and not even directionally better), cost slightly higher, judge within the judge's own ±20 noise (old sf reps re-judged this run to 52–78 for the same answers — the score axis is too noisy to read). The trace confirms the mechanism of the null: **the agent kept re-opening the hit files with `sf code` (structure reads refs had already given as enclosing signatures) regardless of the completeness note.** The `--bodies` lever was already ruled out (the agent never fetched bodies — it re-fetched *structures*).
+
+**Consequence / what this means for "developing the refs win":**
+- The refs turn-collapse vs plain (**~18–20 vs 42 turns**, −55%) is real and robust — that's the confirmed product win, and it stands.
+- It is **bounded by agent behaviour, not by refs' capability**: the agent over-fetches (re-scans files refs already covered) and neither guidance nor a `--bodies`/more-context feature addresses that — refs is already self-sufficient for the task; the agent just doesn't trust it. Consistent with the program's standing finding (H1/H4/H-A) that preamble nudges don't reliably move tool-use.
+- **Action taken:** the guidance additions (SKILL.md, agents_block.md, harness preamble) were **reverted** — an unearned completeness note that taxes every session's context for no measured benefit is exactly the over-nudge the program avoids. refs.md keeps the (earned) turn-collapse numbers. Net: refs is validated and its win documented; there is no cheap way to make it bigger, and we don't pretend otherwise.
+
+Total follow-up spend ≈ $2.9 (diagnostic rep $0.54 + 3 guided reps + judge).
