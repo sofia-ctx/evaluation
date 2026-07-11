@@ -101,3 +101,22 @@ Guidance telling the agent "refs output IS the usage map, don't re-open" did **n
 - **Action taken:** the guidance additions (SKILL.md, agents_block.md, harness preamble) were **reverted** — an unearned completeness note that taxes every session's context for no measured benefit is exactly the over-nudge the program avoids. refs.md keeps the (earned) turn-collapse numbers. Net: refs is validated and its win documented; there is no cheap way to make it bigger, and we don't pretend otherwise.
 
 Total follow-up spend ≈ $2.9 (diagnostic rep $0.54 + 3 guided reps + judge).
+
+---
+
+## Model axis (2026-07-11): opus vs the sonnet baseline
+
+**Pre-registered BEFORE the opus run.** First point on the `MODEL` re-calibration axis (see the benchmark section in README): the over-fetch is a model/harness property, not an `sf` property — so re-run the *same* frozen probe under a stronger model.
+
+### Question
+Does opus over-fetch less than sonnet? Sonnet's sf arm, given a self-sufficient `sf refs` answer, still fanned out to ~5–10 `sf code` re-reads (median 18 turns). A stronger model might trust the structured answer more (fewer re-reads → the refs win widens), or over-fetch is robust across tiers (same behaviour → the win is model-agnostic). Either result is informative.
+
+### Design
+Same task `t5_refs`, same BASE_SHA=257718b, same preambles/arms — only `MODEL=opus`. Compare to the sonnet n=3 baseline (sf turns 18 / plain 42; sf code-call fan 5–10). Primary read = the sf arm's **turns + `sf code` re-read count** (the over-fetch signal) from `calls.jsonl`; plain arm for the turn-collapse delta on opus; cost/judge reported.
+
+### Stop-loss (opus is ~5× sonnet's per-token price)
+n=1 each arm FIRST; inspect the sf trace (does opus fan out after `sf refs`?). Escalate to n=3 ONLY if the n=1 direction is worth confirming AND the cost is acceptable — flag spend before escalating. No claim beyond "trace + direction" at n=1.
+
+### Results
+
+(appended after the opus run)

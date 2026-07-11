@@ -22,6 +22,44 @@ and
 [`macro.md`](https://github.com/sofia-ctx/sofia/blob/main/docs/measurements/evaluation/macro.md)
 in `sofia-ctx/sofia`.
 
+## What this really measures: structured-output trust (the over-fetch probes)
+
+Every `sf` command trades a full file read for a smaller structured answer
+(`sf code`'s signature map, `sf refs`'s labelled hit list, a summarised
+directory). That trade only pays off if the agent **trusts the structured
+answer and doesn't re-read the source anyway**. Across every pilot here the
+recurring failure is the same: the agent gets the compact answer and then
+re-opens the file (or re-greps, or re-fetches an identical call) — *over-fetch*
+— erasing the saving. Documented instances:
+
+- **re-fetch hammer** (H1): 8× byte-identical `sf code` calls.
+- **batch→re-open** (H4): batches a directory map, then opens each file one by one.
+- **native-Read-after-passthrough** (H-A): `sf code` returns a small file raw, agent Reads it again. Root cause is a Claude Code *harness* rule — a native Read is required before an Edit — so for edit targets the re-read is unavoidable by construction, not a model choice.
+- **refs → code fan** (t5_refs): `sf refs` returns every hit with its enclosing signature (self-sufficient for the task), yet the agent still re-opens ~8 files.
+- **summarise → re-fetch bodies** (t6_dirmap): a 75%-smaller summarised dir map is offset by the agent re-fetching the omitted bodies, for a *higher* net context integral.
+
+Two findings make this the load-bearing variable, not a footnote:
+
+1. **It is not fixable from `sf`'s side.** Guidance telling the agent "the structured answer is complete, don't re-read" was tried twice (H-A, t5_refs) and came back **null both times** — preamble nudges don't move tool-use. So `sf`'s value is *bounded by how much the agent trusts structured output*, which is a property of the **model/harness, not of `sf`**.
+2. **Therefore it is model-dependent, and this harness is the instrument to measure it.** The honest claim is not "`sf` saves tokens" but "`sf` saves tokens *for agents that trust structured output* — here is the per-model number." Whether a stronger model over-fetches less, or a future release re-interprets the same output, is exactly what re-running these frozen probes detects.
+
+### The suite is a re-runnable benchmark, not one-off results
+Each pilot in [`results/`](results/) is **pre-registered** (hypothesis,
+criteria, honest-null clause, stop-loss) *before* any paid run — a frozen
+protocol you can re-run and compare. The core over-fetch probes are the
+many-file structural tasks: `t4_dispatch` (map a dispatch spine), `t5_refs`
+(map every use of a symbol), `t6_dirmap` (map a package). The single-file tasks
+(`t1`–`t3`) are the boundary cases where `sf` structurally can't win (small
+file + edit → the native read is mandatory).
+
+**The re-calibration axis is `MODEL`.** Re-run any probe under a different
+model — `MODEL=opus`/`sonnet`/`haiku` needs no code change (same harness) — to
+see whether that model over-fetches more or less. Porting the *same* probes to
+a non-Claude agent (GPT/Gemini/Grok) needs a harness adapter around their
+headless loop, and care to separate model behaviour from harness constraints
+(the H-A native-Read rule is Claude Code's, not the model's) — designed for,
+built on demand.
+
 ## Design
 
 - **2 arms:**
