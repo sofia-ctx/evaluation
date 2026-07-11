@@ -136,3 +136,32 @@ The turn-collapse that was **−57%** on sonnet (sf 18 vs plain 42) is **~−15%
 **Strategic reading (first point on the MODEL axis):** `sf`'s value is **inversely proportional to model capability** on this probe. It buys the most for **weaker/cheaper agents** (sonnet — and by extension haiku), whose plain baseline over-fetches; for the **strongest** models (opus) the plain baseline is already lean, so `sf`'s structural tools are roughly break-even. Honest consequence for positioning: pitch `sf` as a token-economy lever for high-volume work on cheaper models, **not** as a universal win — on a top model the agent doesn't need the crutch. (Cost footnote: opus was *not* ~5× dearer per run — $0.55–0.64 vs sonnet's $0.56–0.97 — because its lower turn count offsets the higher per-token price.)
 
 Caveat: n=3, one task, one strong model. The direction (win shrinks as the model strengthens) is clean and mechanistically sound; the exact opus break-even point isn't pinned. Next axis point that would sharpen it: **haiku** (predict the *largest* refs win, since the weakest baseline fans out most). opus spend ≈ $3.7.
+
+### haiku — the weak end of the axis (2026-07-11)
+
+**Pre-registered before the run.** Completes the weak→strong curve haiku → sonnet → opus. **Prediction:** haiku (weakest) shows the **largest** refs turn-collapse — a weak model's plain-grep baseline should fan out the most (sonnet-plain already hit 42 turns; haiku-plain should be ≥ that), while `sf refs` gives it the same one-call map, so sf−plain gap widens. Confounder to watch: a weak model may also **mis-use** `sf refs`/over-fetch *more* in the sf arm, or fail the task (low judge) — if the sf arm doesn't hold quality, "cheaper" is hollow. Same task/BASE_SHA/arms, `MODEL=haiku`, n=3 (reps 20–22), haiku ≈ 1/12 sonnet's price so full n=3 is ~$1.
+
+#### Results (MODEL=haiku, n=3, reps 20–22)
+
+| median n=3 | haiku sf | haiku plain |
+| --- | ---: | ---: |
+| turns | **30**  [28,30,30] | **15**  [15,15,21] |
+| cost $ | 0.190 | 0.155 |
+| cache_read (integral) | 1027K  [1027,1225,762] | 601K  [601,262,757] |
+| judge | 38  [38,52,38] | 30  [45,22,30] |
+
+**Prediction WRONG — and the miss is the finding.** haiku's sf arm is **2× worse** than its plain arm (30 vs 15 turns, 1027K vs 601K integral), for a marginal quality bump (38 vs 30, both failing). The confounder won: a weak model **can't wield the richer toolset** — the trace shows haiku flailing (mixing native Reads and sf calls, fumbling absolute vs `./` paths, tripping the hook nudge), making ~30 turns but only ~4 productive sf calls/rep. With plain grep it's *constrained* to a simpler 15-turn path. **The rich sf toolset HURTS a model too weak to drive it** (more ways to go wrong), so `sf` is a net loss on haiku.
+
+## Model-axis synthesis (t5_refs, n=3 each) — an inverted-U, not "inverse to strength"
+
+| model | sf turns | plain turns | sf vs plain | verdict |
+| --- | ---: | ---: | --- | --- |
+| **haiku** (weak) | 30 | 15 | **+100% (worse)** | sf LOSES — too weak to use the tools |
+| **sonnet** (mid) | 18 | 42 | **−57%** | sf WINS big — the sweet spot |
+| **opus** (strong) | 11 | 13 | ~−15% (parity) | sf ≈ break-even — doesn't need it |
+
+The opus point alone read as "sf value is inversely proportional to model strength." Haiku **corrects** that to a **Goldilocks / inverted-U**: `sf`'s value peaks in the *middle*. Both extremes lose it — the **strong** model's plain baseline is already efficient (nothing to collapse), the **weak** model can't drive the richer toolset (it flails and over-fetches *more* with sf than without). `sf` pays off for the band of models **capable enough to use it correctly, yet weak enough that their plain baseline over-fetches** — sonnet-class here.
+
+**Positioning consequence (revised):** not "sf for cheap models" — it's **"sf for the mid-tier workhorse"** (sonnet-class), the model you actually run high-volume coding on. On a frontier model it's roughly free; on the cheapest/weakest it can *backfire*, so a plugin that force-nudges a weak agent toward structural tools may cost more than it saves. Worth a per-deployment check (the `MODEL` axis is exactly that instrument), not a blanket "always on".
+
+Caveats: one task, n=3, judge noisy (±20–45; rest the verdict on turns/integral, which are clean and monotone-per-model). The inverted-U is three points — the *shape* is robust (loss / big-win / parity is a large, mechanistically-explained spread), the exact peak/breakeven isn't pinned. Total model-axis spend: opus ≈ $3.7 + haiku ≈ $1.1 (haiku cheap despite more turns).
