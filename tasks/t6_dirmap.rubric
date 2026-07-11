@@ -1,0 +1,72 @@
+Task: map the `internal/cc` package (sofia-ctx/sofia, frozen at BASE_SHA).
+Package-structure comprehension across 11 files — no edits expected.
+
+Reference facts (frozen, verified against the real files at BASE_SHA):
+
+1) Subcommands (7 — each built by a `newXCommand() *cobra.Command`, attached to
+   the package root `NewCommand()`):
+   - bash: top shell commands run across sessions, deduped & categorised.
+   - candidates: sf-adoption candidates — heavy tools, repeated commands/reads.
+   - ls: list recent sessions (table of the parsed Session metadata).
+   - prompts: the user prompts from a session.
+   - resume: resume a session with a small context (pairs with `sf cc`).
+   - show: detail of one session.
+   - value: per-session value/cost roll-up (tokens, duration, cost).
+   Helpers that are NOT subcommands: cc.go (session parsing + root + models),
+   category.go (categoriser), mcp.go (MCP-call parsing), pricing.go (cost
+   tables), candidates helpers. Listing mcp/pricing/category as subcommands is
+   an error.
+
+2) Session model:
+   - Central type `Session` (in cc.go) — the parsed session. Key fields:
+     identity: Path, ID, FullID, Project, Cwd, Branch, Model, Version, Title;
+     tool usage: ToolCalls map[string]int, ToolResultTokens map[string]int64,
+     Bash []string, Files []FileTouch, FatResults []FatResult;
+     token/cost counters: OutputTokens, InputTokens, CacheReadTokens,
+     CacheCreateTokens, DurationMs (+ Messages, SizeBytes, UserPrompts, PRs).
+   - `SessionFile` (Path, Stem, DirName, ModTime, Size) is the separate on-disk
+     discovery type (a file found before it's parsed into a Session).
+
+3) Command→logic pattern (uniform across the subcommands):
+   `newXCommand() *cobra.Command` builds the cobra command and its flags, whose
+   RunE calls a `runX(...)` logic function that takes an output `w io.Writer`
+   (e.g. `runBash(path string, opts bashOptions, w io.Writer) error`,
+   `runLs(projectsDir string, opts lsOptions, w io.Writer) error`) and, where a
+   command has flags, a per-command options struct (bashOptions, lsOptions, …).
+   Deviation to note: not every subcommand has its own options struct — the
+   simpler ones (e.g. prompts/resume) pass plain args (path/format) rather than
+   an `xOptions` struct; several `run*` take the parsed `[]*Session` directly
+   (candidates, value) instead of a path. Accept a correct statement of "cobra
+   constructor → run* with an io.Writer, options struct only for the
+   flag-heavy commands".
+
+4) Command categorization (category.go):
+   - 8 categories, the consts CatSearch/CatRead/CatGit/CatTest/CatBuild/CatDB/
+     CatFS/CatOther ("search","read","git","test","build","db","fs","other").
+   - `Categorize(cmd string) string` assigns one, walking an ordered
+     `catRules` table of `{regexp, category}` — FIRST match wins (order matters:
+     test/db rules precede the generic build/tooling rules so `composer test`
+     is test, not build).
+   - Rule KINDS: word-boundary regexes on command names. Representative:
+     test = `phpunit|pest|jest|pytest|go test|cargo test|…`, `(npm|yarn|composer)
+     (run )?test`, `make test`; build = `go build|cargo build|tsc|vite build|
+     docker build|make`, and package managers `npm|yarn|composer|pip|…`;
+     git = `\bgit\b`; db = `mysql|psql|sqlite3|…`, `artisan|doctrine|migrate|…`;
+     search = `grep|rg|ag|fd|find`; read = `cat|head|tail|less|sed|awk|jq|wc`.
+
+Scoring guidance:
+- A top answer: all 7 subcommands (no helper mislabelled as a command); Session
+  as the central type with fields grouped correctly + SessionFile called out;
+  the constructor→run*(…, w)→options pattern with the "not all have an options
+  struct" deviation; and Q4 with the 8 categories + Categorize + the ordered
+  first-match regex-on-command-name rule kinds WITH representative examples.
+- Q4 is the discriminator: naming the 8 consts is worth partial credit, but
+  describing the actual rule KINDS (regex on command names, ordered first-match,
+  concrete examples like `go test`→test, `git`→git) is the completeness signal —
+  it needs category.go's body, whether read raw (small file) or via a targeted
+  slice.
+- Do NOT reward or penalise HOW the map was gathered (raw whole-files vs
+  summarised signatures vs targeted slices); score only correctness/completeness
+  of the produced map. Penalise: a mislabelled subcommand, missing Session
+  fields groups, claiming every command has an options struct, or Q4 answered
+  only at the const-name level with no rule-kind detail.

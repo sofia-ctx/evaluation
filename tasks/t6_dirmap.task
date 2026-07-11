@@ -1,0 +1,26 @@
+Map the `internal/cc` package (sofia-ctx/sofia, frozen at BASE_SHA) — it parses
+Claude Code session-log files and exposes several `sf cc` subcommands. This is
+a package-structure comprehension task spanning the whole package; produce a
+compact map answering all four:
+
+1) Subcommands. List every `sf cc` subcommand the package registers, each with a
+   one-line purpose. (Note: some files in the package are shared helpers, not
+   subcommands — don't list those as commands.)
+
+2) Shared session model. Name the central type the subcommands read (the
+   parsed-session struct); list its most important fields grouped as identity
+   (who/where/which project & branch), tool-usage, and token/cost counters; and
+   name the separate type used for on-disk session-file discovery.
+
+3) Command→logic pattern. State the uniform wiring the subcommands share — the
+   per-command cobra constructor, the run function it calls (its signature
+   shape), and the per-command options struct — and call out any subcommand
+   that deviates from it.
+
+4) Command categorization. How are shell commands bucketed into categories?
+   Name the full category set, the function that assigns a category, and
+   summarize the KINDS of matching rules used — i.e. what actually distinguishes
+   a "test" command from a "build" or "git" one (give representative examples).
+
+Answer compactly; a small table per question is fine. Do NOT modify any files —
+this is an investigation and summary task only.
